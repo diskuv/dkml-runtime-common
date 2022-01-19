@@ -984,8 +984,10 @@ autodetect_cpus() {
 #   options necessary to cross-compile (or native compile) to the target PLATFORM. 'dev' is always
 #   a native compilation.
 # - env:WORK - Optional. If provided will be used as temporary directory
-# - env:DKML_COMPILE_VS_DIR - Optional. If provided with all three (3) DKML_COMPILE_VS_* variables the
-#   specified installation directory of Visual Studio will be used.
+# - env:DKML_COMPILE_SPEC - Optional. Only version "1" is supported
+# - env:DKML_COMPILE_TYPE - Optional. If set to "VS" and all five (5) DKML_COMPILE_VS_* variables
+#   are specified then the chosen Visual Studio will be automatically used.
+# - env:DKML_COMPILE_VS_DIR - Optional. If provided it must be an installation directory of Visual Studio.
 #   The directory should contain VC and Common7 subfolders.
 # - env:DKML_COMPILE_VS_VCVARSVER - Optional. If provided it must be a version that can locate the Visual Studio
 #   installation in DKML_COMPILE_VS_DIR when `vsdevcmd.bat -vcvars_ver=VERSION` is invoked. Example: `14.26`

@@ -769,11 +769,22 @@ install_reproducible_script_with_args() {
     install_reproducible_file "$install_reproducible_script_with_args_SCRIPTFILE"
     "$DKMLSYS_INSTALL" -d "$install_reproducible_script_with_args_BOOTSTRAPDIR"/"$install_reproducible_script_with_args_RECREATEDIR"/
     {
-        printf "#!/bin/sh\nset -euf\nexec env TOPDIR=\"\$PWD/%s/vendor/dkml-runtime-common/all/emptytop\" %s " \
+        printf "#!/bin/sh\n"
+        printf "set -euf\n"
+        # shellcheck disable=SC2016
+        printf 'if [ "${DKML_BUILD_TRACE:-}" = ON ] && [ "${DKML_BUILD_TRACE_LEVEL:-0}" -ge 2 ]; then\n'
+        printf "  exec env TOPDIR=\"\$PWD/%s/vendor/dkml-runtime-common/all/emptytop\" bash -x %s " \
             "$install_reproducible_script_with_args_BOOTSTRAPRELDIR" \
             "$install_reproducible_script_with_args_BOOTSTRAPRELDIR/$install_reproducible_script_with_args_SCRIPTFILE"
         escape_args_for_shell "$@"
         printf "\n"
+        printf "else\n"
+        printf "  exec env TOPDIR=\"\$PWD/%s/vendor/dkml-runtime-common/all/emptytop\" %s " \
+            "$install_reproducible_script_with_args_BOOTSTRAPRELDIR" \
+            "$install_reproducible_script_with_args_BOOTSTRAPRELDIR/$install_reproducible_script_with_args_SCRIPTFILE"
+        escape_args_for_shell "$@"
+        printf "\n"
+        printf "fi\n"
     } > "$install_reproducible_script_with_args_BOOTSTRAPDIR"/"$install_reproducible_script_with_args_RECREATEFILE"
     "$DKMLSYS_CHMOD" 755 "$install_reproducible_script_with_args_BOOTSTRAPDIR"/"$install_reproducible_script_with_args_RECREATEFILE"
 }
@@ -1373,18 +1384,37 @@ autodetect_compiler() {
     #   https://gitlab.com/diskuv/diskuv-ocaml/-/blob/aabf3171af67a0a0ff4779c336867a7a43e3670f/etc/opam-repositories/diskuv-opam-repo/packages/ocaml-variants/ocaml-variants.4.12.0+options+dkml+msvc64/opam#L52-62
     export OCAML_HOST_TRIPLET=
 
+    if [ "${DKML_BUILD_TRACE:-OFF}" = ON ] && [ "${DKML_BUILD_TRACE_LEVEL:-0}" -ge 2 ] ; then
+        printf '@+ autodetect_compiler env\n' >&2
+        "$DKMLSYS_ENV" | "$DKMLSYS_SED" 's/^/@env+| /' | "$DKMLSYS_AWK" '{print}' >&2
+        printf '@env?| DKML_COMPILE_SPEC=%s\n' "${DKML_COMPILE_SPEC:-}" >&2
+        printf '@env?| DKML_COMPILE_TYPE=%s\n' "${DKML_COMPILE_TYPE:-}" >&2
+    fi
+
     if [ "${DKML_COMPILE_SPEC:-}" = 1 ] && [ "${DKML_COMPILE_TYPE:-}" = VS ]; then
+        [ "${DKML_BUILD_TRACE:-OFF}" = OFF ] || printf "+: autodetect_vsdev DKML_COMPILE_SPEC=1 DKML_COMPILE_TYPE=VS\n" >&2
         autodetect_vsdev # set DKMLPARENTHOME_BUILDHOST and VSDEV_*
+        [ "${DKML_BUILD_TRACE:-OFF}" = OFF ] || printf "+: autodetect_compiler_vsdev DKML_COMPILE_SPEC=1 DKML_COMPILE_TYPE=VS\n" >&2
         autodetect_compiler_vsdev
     elif [ "${DKML_COMPILE_SPEC:-}" = 1 ] && [ "${DKML_COMPILE_TYPE:-}" = CM ]; then
+        [ "${DKML_BUILD_TRACE:-OFF}" = OFF ] || printf "+: autodetect_compiler_cmake DKML_COMPILE_SPEC=1 DKML_COMPILE_TYPE=CM\n" >&2
         autodetect_compiler_cmake
     elif autodetect_vsdev && [ -n "$VSDEV_HOME_UNIX" ]; then
         # `autodetect_vsdev` will have set DKMLPARENTHOME_BUILDHOST and VSDEV_*
+        [ "${DKML_BUILD_TRACE:-OFF}" = OFF ] || printf "+: autodetect_compiler_vsdev autodetect_vsdev=true VSDEV_HOME_UNIX=%s\n" "$VSDEV_HOME_UNIX" >&2
         autodetect_compiler_vsdev
     elif [ "$autodetect_compiler_PLATFORM_ARCH" = "darwin_x86_64" ] || [ "$autodetect_compiler_PLATFORM_ARCH" = "darwin_arm64" ]; then
+        [ "${DKML_BUILD_TRACE:-OFF}" = OFF ] || printf "+: autodetect_compiler_darwin PLATFORM_ARCH=darwin_{x86_64,arm64}\n" >&2
         autodetect_compiler_darwin
     else
+        [ "${DKML_BUILD_TRACE:-OFF}" = OFF ] || printf "+: autodetect_compiler_system\n" >&2
         autodetect_compiler_system
+    fi
+
+    if [ "${DKML_BUILD_TRACE:-OFF}" = ON ]; then
+        autodetect_compiler_OUTPUTBASENAME=$(basename "$autodetect_compiler_OUTPUTFILE")
+        printf "@+= autodetect_compiler > %s\n" "$autodetect_compiler_OUTPUTFILE" >&2
+        "$DKMLSYS_SED" 's/^/@'"$autodetect_compiler_OUTPUTBASENAME"'+| /' "$autodetect_compiler_OUTPUTFILE" | "$DKMLSYS_AWK" '{print}' >&2
     fi
 
     # When $WORK is not defined, we have a unique directory that needs cleaning

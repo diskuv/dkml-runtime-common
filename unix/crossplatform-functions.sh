@@ -409,10 +409,13 @@ is_unixy_windows_build_machine() {
     return 1
 }
 
-# Is a MSYS2 environment with the MSYS subsystem? (MSYS2 can also do MinGW 32-bit
-# and 64-bit subsystems)
+# Is a MSYS2 environment with the MSYS or MINGW64 subsystem?
+# * MSYS2 can also do MinGW 32-bit and 64-bit subsystems. Used by Diskuv OCaml
+# * MINGW64 used by Git Bash (aka. GitHub Actions `shell: bash`)
 is_msys2_msys_build_machine() {
-    if [ -e /usr/bin/msys-2.0.dll ] && [ "${MSYSTEM:-}" = "MSYS" ]; then
+    if [ -e /usr/bin/msys-2.0.dll ] && {
+        [ "${MSYSTEM:-}" = "MSYS" ] || [ "${MSYSTEM:-}" = "MINGW64" ]
+    }; then
         return 0
     fi
     return 1
@@ -675,9 +678,15 @@ install_reproducible_system_packages() {
     "$DKMLSYS_INSTALL" -d "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTDIR"/
 
     if is_msys2_msys_build_machine; then
-        # https://wiki.archlinux.org/title/Pacman/Tips_and_tricks#List_of_installed_packages
-        pacman -Qqet > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
-        printf "#!/bin/sh\nexec pacman -S \"\$@\" --needed - < '%s'\n" "$install_reproducible_system_packages_BOOTSTRAPRELDIR/$install_reproducible_system_packages_PACKAGEFILE" > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"
+        if [ -x /git-bash.exe ]; then
+            # Git Bash
+            true > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
+            printf "#!/bin/sh\necho Install Git for Windows from https://git-scm.com/download/win which gives you Git Bash. Git Bash should be used to run the remaining scripts\n" > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"
+        else
+            # https://wiki.archlinux.org/title/Pacman/Tips_and_tricks#List_of_installed_packages
+            pacman -Qqet > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
+            printf "#!/bin/sh\nexec pacman -S \"\$@\" --needed - < '%s'\n" "$install_reproducible_system_packages_BOOTSTRAPRELDIR/$install_reproducible_system_packages_PACKAGEFILE" > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"
+        fi
     elif is_cygwin_build_machine; then
         cygcheck.exe -c -d > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
         {
@@ -1630,7 +1639,7 @@ autodetect_compiler_system() {
                 [ -n "${autodetect_compiler_system_LD:-}" ] && printf "  (\"LDFLAGS\" \"%s\")\n" "${autodetect_compiler_system_LDFLAGS:-}"
             elif [ "$autodetect_compiler_OUTPUTMODE" = LAUNCHER ]; then
                 printf "  CC=%s %s\n" "$autodetect_compiler_system_GCC" "\\"
-                printf "  CFLAGS=%s %s\n" "${autodetect_compiler_system_CFLAGS:-}" "\\"                        
+                printf "  CFLAGS=%s %s\n" "${autodetect_compiler_system_CFLAGS:-}" "\\"
                 [ -n "${autodetect_compiler_system_GPLUSPLUS:-}" ] && printf "  CXX=%s %s\n" "$autodetect_compiler_system_GPLUSPLUS" "\\"
                 [ -n "${autodetect_compiler_system_GPLUSPLUS:-}" ] && printf "  CXXFLAGS=%s %s\n" "${autodetect_compiler_system_CXXFLAGS:-}" "\\"
                 [ -n "${autodetect_compiler_system_AS:-}" ] && printf "  AS=%s %s\n" "$autodetect_compiler_system_AS" "\\"

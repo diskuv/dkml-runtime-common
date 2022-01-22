@@ -733,8 +733,11 @@ install_reproducible_system_packages() {
             printf "sudo dpkg --set-selections < '%s')\n" "$install_reproducible_system_packages_BOOTSTRAPRELDIR/$install_reproducible_system_packages_PACKAGEFILE"
             printf 'sudo apt-get dselect-upgrade\n'
         } > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"
+    elif [ -n "${DEFAULT_DOCKCROSS_IMAGE:}" ]; then
+        true > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
+        printf "#!/bin/sh\necho Run from inside the %s Docker container\n" "$DEFAULT_DOCKCROSS_IMAGE" > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"
     else
-        printf "%s\n" "TODO: install_reproducible_system_packages for non-Windows platforms" >&2
+        printf "%s\n" "TODO: unsupport install_reproducible_system_packages platform" >&2
         exit 1
     fi
     "$DKMLSYS_CHMOD" 755 "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"

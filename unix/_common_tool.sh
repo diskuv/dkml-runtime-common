@@ -701,6 +701,14 @@ print_opam_logs_on_error() {
     eval "$print_opam_logs_on_error_OLDSTATE"
 }
 
+# [has_rsync] checks if the machine has rsync.
+has_rsync() {
+    if command -v rsync >/dev/null 2>&1; then
+        return 0
+    fi
+    return 1
+}
+
 # [spawn_rsync ARGS] runs an rsync with options selected for human readability or for CI.
 # You do not need to specify the options:
 # * --info=progress2

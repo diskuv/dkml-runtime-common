@@ -199,7 +199,7 @@ OPAM_ARCH_IN_WINDOWS=amd64
 OPAM_PORT_FOR_SWITCHES_IN_WINDOWS=msvc
 #
 # Which variant we will use for all the switches in Windows.
-# Pick from a msys2 variant in $DiskuvOCamlHome/etc/opam-repositories/diskuv-opam-repo
+# Pick from a msys2 variant in $DiskuvOCamlHome/etc/opam-repositories/diskuv-opam-repository
 # that aligns with the OPAM_PORT_FOR_SWITCHES_IN_WINDOWS.
 set_ocaml_variant_for_windows_switches() {
     set_ocaml_variant_for_windows_switches_VERSION="$1"

@@ -286,6 +286,7 @@ autodetect_system_path() {
 # - env:DKMLSYS_STAT - Location of `stat`
 # - env:DKMLSYS_GREP - Location of `grep`
 # - env:DKMLSYS_CURL - Location of `curl`
+# - env:DKMLSYS_TR - Location of `tr`
 autodetect_system_binaries() {
     if [ -z "${DKMLSYS_MV:-}" ]; then
         if [ -x /usr/bin/mv ]; then
@@ -385,8 +386,15 @@ autodetect_system_binaries() {
             DKMLSYS_CURL=/bin/curl
         fi
     fi
+    if [ -z "${DKMLSYS_TR:-}" ]; then
+        if [ -x /usr/bin/tr ]; then
+            DKMLSYS_TR=/usr/bin/tr
+        else
+            DKMLSYS_TR=/bin/tr
+        fi
+    fi
     export DKMLSYS_MV DKMLSYS_CHMOD DKMLSYS_UNAME DKMLSYS_ENV DKMLSYS_AWK DKMLSYS_SED DKMLSYS_COMM DKMLSYS_INSTALL
-    export DKMLSYS_RM DKMLSYS_SORT DKMLSYS_CAT DKMLSYS_STAT DKMLSYS_GREP DKMLSYS_CURL
+    export DKMLSYS_RM DKMLSYS_SORT DKMLSYS_CAT DKMLSYS_STAT DKMLSYS_GREP DKMLSYS_CURL DKMLSYS_TR
 }
 
 # Is a Windows build machine if we are in a MSYS2 or Cygwin environment.

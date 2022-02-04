@@ -60,7 +60,7 @@ if [ ! -e "$DKMLDIR/.dkmlroot" ]; then echo "FATAL: Not embedded within or launc
 # set $dkml_root_version
 # shellcheck disable=SC1091
 . "$DKMLDIR"/.dkmlroot
-dkml_root_version=$(echo "$dkml_root_version" | PATH=/usr/bin:/bin tr -d '\r')
+dkml_root_version=$(printf "%s" "$dkml_root_version" | PATH=/usr/bin:/bin tr -d '\r')
 
 if [ -z "${TOPDIR:-}" ]; then
     # Check at most 10 ancestors

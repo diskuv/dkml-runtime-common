@@ -103,6 +103,7 @@ set_dkmlparenthomedir() {
 # - env:DiskuvOCamlMSYS2Dir - optional
 # Outputs:
 # - env:DKMLPARENTHOME_BUILDHOST
+# - env:DKMLVERSION - set if DiskuvOCaml installed. The installed version number
 # - env:DKMLHOME_BUILDHOST - set if DiskuvOCaml installed. Path will be in Windows (semicolon separated) or Unix (colon separated) format
 # - env:DKMLHOME_UNIX - set if DiskuvOCaml installed. Path will be in Unix (colon separated) format
 # - env:DKMLBINPATHS_BUILDHOST - set if DiskuvOCaml installed. Paths will be in Windows (semicolon separated) or Unix (colon separated) format
@@ -120,6 +121,7 @@ autodetect_dkmlvars() {
     set_dkmlparenthomedir
 
     # Init output vars
+    DKMLVERSION=
     DKMLHOME_UNIX=
     DKMLHOME_BUILDHOST=
     DKMLBINPATHS_UNIX=
@@ -162,6 +164,9 @@ autodetect_dkmlvars() {
         printf "FATAL: Only able to read Diskuv OCaml variables version '1' and '2'. Instead Diskuv OCaml variables for %s were on version '%s'\n" "$DiskuvOCamlHome" "$DiskuvOCamlVarsVersion" >&2
         exit 107
     fi
+
+    # shellcheck disable=SC2034
+    DKMLVERSION="$DiskuvOCamlVersion"
 
     # Unixize DiskuvOCamlHome
     if [ -x /usr/bin/cygpath ]; then

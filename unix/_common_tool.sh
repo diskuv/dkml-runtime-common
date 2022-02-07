@@ -487,10 +487,24 @@ set_opamrootdir() {
 set_opamswitchdir_of_system() {
     set_opamswitchdir_of_system_PLATFORM=$1
     shift
+
+    # !!!!!!!!!!!!!
+    # CHANGE NOTICE
+    # !!!!!!!!!!!!!
+    #
+    # Do not change the behavior of this function without also
+    # changing diskuv-sdk > 140-opam-switch-host-tools > CMakeLists.txt.
+
+    # Name the switch. Since there may be a zillion switches in the user's default
+    # OPAMROOT (ie. USERMODE=ON), we have an unambiguous switch name that identifies
+    # that the switch is for Diskuv (either through "dksdk-*" or "diskuv-*" or
+    # a local switch that is part of DiskuvOCamlHome).
     if [ "${DKSDK_INVOCATION:-OFF}" = ON ]; then
         set_opamswitchdir_of_system_SWITCHBASE="dksdk-$set_opamswitchdir_of_system_PLATFORM"
+        set_opamswitchdir_of_system_SWITCHBASE_UNAMBIGUOUS="$set_opamswitchdir_of_system_SWITCHBASE"
     else
         set_opamswitchdir_of_system_SWITCHBASE="host-tools"
+        set_opamswitchdir_of_system_SWITCHBASE_UNAMBIGUOUS="diskuv-host-tools"
     fi
 
     # Set OPAMROOTDIR_BUILDHOST
@@ -498,27 +512,17 @@ set_opamswitchdir_of_system() {
     # Set DKMLHOME_UNIX if available
     autodetect_dkmlvars || true
     # Set OPAMSWITCHFINALDIR_BUILDHOST and OPAMSWITCHDIR_EXPAND
-    if [ "${DKML_FEATUREFLAG_CMAKE_PLATFORM:-OFF}" = OFF ]; then
-        if [ -n "${DKMLHOME_UNIX:-}" ] && [ -n "${DKMLHOME_BUILDHOST:-}" ]; then
-            OPAMSWITCHFINALDIR_BUILDHOST="$DKMLHOME_UNIX/${set_opamswitchdir_of_system_SWITCHBASE}/_opam"
-            OPAMSWITCHDIR_EXPAND="$DKMLHOME_BUILDHOST${OS_DIR_SEP}${set_opamswitchdir_of_system_SWITCHBASE}"
-        else
-            OPAMSWITCHFINALDIR_BUILDHOST="$OPAMROOTDIR_BUILDHOST/diskuv-${set_opamswitchdir_of_system_SWITCHBASE}"
-            OPAMSWITCHDIR_EXPAND="diskuv-${set_opamswitchdir_of_system_SWITCHBASE}"
-        fi
+    if cmake_flag_off "$USERMODE"; then
+        OPAMSWITCHDIR_EXPAND="$STATEDIR${OS_DIR_SEP}${set_opamswitchdir_of_system_SWITCHBASE}"
+        OPAMSWITCHFINALDIR_BUILDHOST="$OPAMSWITCHDIR_EXPAND${OS_DIR_SEP}_opam"
     else
-        if cmake_flag_off "$USERMODE"; then
-            OPAMSWITCHDIR_EXPAND="$STATEDIR${OS_DIR_SEP}${set_opamswitchdir_of_system_SWITCHBASE}"
+        if [ -n "${DKMLHOME_BUILDHOST:-}" ]; then
+            OPAMSWITCHDIR_EXPAND="$DKMLHOME_BUILDHOST${OS_DIR_SEP}${set_opamswitchdir_of_system_SWITCHBASE}"
             OPAMSWITCHFINALDIR_BUILDHOST="$OPAMSWITCHDIR_EXPAND${OS_DIR_SEP}_opam"
         else
-            if [ -n "${DKMLHOME_BUILDHOST:-}" ]; then
-                OPAMSWITCHDIR_EXPAND="$DKMLHOME_BUILDHOST${OS_DIR_SEP}${set_opamswitchdir_of_system_SWITCHBASE}"
-                OPAMSWITCHFINALDIR_BUILDHOST="$OPAMSWITCHDIR_EXPAND${OS_DIR_SEP}_opam"
-            else
-                OPAMSWITCHDIR_EXPAND="diskuv-${set_opamswitchdir_of_system_SWITCHBASE}"
-                # shellcheck disable=SC2034
-                OPAMSWITCHFINALDIR_BUILDHOST="$OPAMROOTDIR_BUILDHOST${OS_DIR_SEP}diskuv-${set_opamswitchdir_of_system_SWITCHBASE}"
-            fi
+            OPAMSWITCHDIR_EXPAND="${set_opamswitchdir_of_system_SWITCHBASE_UNAMBIGUOUS}"
+            # shellcheck disable=SC2034
+            OPAMSWITCHFINALDIR_BUILDHOST="$OPAMROOTDIR_BUILDHOST${OS_DIR_SEP}${set_opamswitchdir_of_system_SWITCHBASE_UNAMBIGUOUS}"
         fi
     fi
 }

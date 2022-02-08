@@ -478,12 +478,12 @@ set_opamrootdir() {
 # - env:OPAMSWITCHFINALDIR_BUILDHOST - Either:
 #     The path to the switch that represents the build directory that is usable only on the
 #     build machine (not from within a container). For an external (aka local) switch the returned path will be
-#     a `.../_opam`` folder which is where the final contents of the switch live. Use OPAMSWITCHDIR_EXPAND
+#     a `.../_opam`` folder which is where the final contents of the switch live. Use OPAMSWITCHNAME_EXPAND
 #     if you want an XXX argument for `opam --switch XXX` rather than this path which is not compatible.
-# - env:OPAMSWITCHDIR_EXPAND - Either
+# - env:OPAMSWITCHNAME_EXPAND - Either
 #     The path to the switch **not including any _opam subfolder** that works as an argument to `exec_in_platform` -OR-
 #     The name of a global switch that represents the build directory.
-#     OPAMSWITCHDIR_EXPAND works inside or outside of a container.
+#     OPAMSWITCHNAME_EXPAND works inside or outside of a container.
 set_opamswitchdir_of_system() {
     set_opamswitchdir_of_system_PLATFORM=$1
     shift
@@ -511,16 +511,16 @@ set_opamswitchdir_of_system() {
     set_opamrootdir
     # Set DKMLHOME_UNIX if available
     autodetect_dkmlvars || true
-    # Set OPAMSWITCHFINALDIR_BUILDHOST and OPAMSWITCHDIR_EXPAND
+    # Set OPAMSWITCHFINALDIR_BUILDHOST and OPAMSWITCHNAME_EXPAND
     if cmake_flag_off "$USERMODE"; then
-        OPAMSWITCHDIR_EXPAND="$STATEDIR${OS_DIR_SEP}${set_opamswitchdir_of_system_SWITCHBASE}"
-        OPAMSWITCHFINALDIR_BUILDHOST="$OPAMSWITCHDIR_EXPAND${OS_DIR_SEP}_opam"
+        OPAMSWITCHNAME_EXPAND="${set_opamswitchdir_of_system_SWITCHBASE}"
+        OPAMSWITCHFINALDIR_BUILDHOST="$OPAMROOTDIR_BUILDHOST${OS_DIR_SEP}${set_opamswitchdir_of_system_SWITCHBASE}"
     else
         if [ -n "${DKMLHOME_BUILDHOST:-}" ]; then
-            OPAMSWITCHDIR_EXPAND="$DKMLHOME_BUILDHOST${OS_DIR_SEP}${set_opamswitchdir_of_system_SWITCHBASE}"
-            OPAMSWITCHFINALDIR_BUILDHOST="$OPAMSWITCHDIR_EXPAND${OS_DIR_SEP}_opam"
+            OPAMSWITCHNAME_EXPAND="$DKMLHOME_BUILDHOST${OS_DIR_SEP}${set_opamswitchdir_of_system_SWITCHBASE}"
+            OPAMSWITCHFINALDIR_BUILDHOST="$OPAMSWITCHNAME_EXPAND${OS_DIR_SEP}_opam"
         else
-            OPAMSWITCHDIR_EXPAND="${set_opamswitchdir_of_system_SWITCHBASE_UNAMBIGUOUS}"
+            OPAMSWITCHNAME_EXPAND="${set_opamswitchdir_of_system_SWITCHBASE_UNAMBIGUOUS}"
             # shellcheck disable=SC2034
             OPAMSWITCHFINALDIR_BUILDHOST="$OPAMROOTDIR_BUILDHOST${OS_DIR_SEP}${set_opamswitchdir_of_system_SWITCHBASE_UNAMBIGUOUS}"
         fi

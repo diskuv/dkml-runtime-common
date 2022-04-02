@@ -3,24 +3,25 @@
 * text=auto
 
 # Explicitly declare text files you want to always be normalized and converted
-# to native line endings on checkout. Should be *none*.
+# to native line endings on checkout.
+*.c text
+*.h text
+*.md text
+*.opam text
+*.opam.template text
+Makefile text
+dune text
+dune-project text
+opam text
 
 # Declare files that will always have LF line endings on checkout.
-*.c text eol=lf
-*.h text eol=lf
-*.mli text eol=lf
-*.ml text eol=lf
-*.md text eol=lf
-*.opam text eol=lf
-Makefile text eol=lf
-dune text eol=lf
-opam text eol=lf
 *.patch text eol=lf
 *.sexp text eol=lf
 *.sh text eol=lf
-*.cachekey text eol=lf
-.gitmodules text eol=lf
-.gitattributes text eol=lf
+*.mli text eol=lf
+*.ml text eol=lf
+*.opam text eol=lf
+*.opam.template text eol=lf
 
 # Declare files that will always have CRLF line endings on checkout.
 *.sln text eol=crlf
@@ -36,7 +37,3 @@ opam text eol=lf
 #       "View > Change File Encoding > Save with Encoding > UTF-16LE" in Visual Studio Code to save the file correctly.
 *.ps1 text working-tree-encoding=UTF-16 eol=CRLF
 *.psm1 text working-tree-encoding=UTF-16 eol=CRLF
-
-# Denote all files that are truly binary and should not be modified.
-*.png binary
-*.jpg binary

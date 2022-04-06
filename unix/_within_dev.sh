@@ -89,7 +89,7 @@ fi
 # ------------------
 
 DKMLDIR=$(dirname "$0")
-DKMLDIR=$(cd "$DKMLDIR"/../.. && pwd)
+DKMLDIR=$(cd "$DKMLDIR"/../../.. && pwd)
 
 if [ -n "${STATEDIR:-}" ]; then
     # shellcheck disable=SC1091

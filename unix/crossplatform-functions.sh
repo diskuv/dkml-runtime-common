@@ -1717,6 +1717,8 @@ autodetect_compiler_vsdev() {
         printf "%s\n" ')'
         printf "set > %s%s%s%s\n" '"' "$autodetect_compiler_TEMPDIR_WIN" '\vcvars.txt' '"'
     } > "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat
+    #   +x for Cygwin (not needed for MSYS2)
+    chmod +x "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat
 
     # SECOND, construct a function that will call Microsoft's vsdevcmd.bat script.
     # We will use DKML_SYSTEM_PATH for reproducibility.

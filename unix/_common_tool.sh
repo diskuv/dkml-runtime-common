@@ -464,7 +464,7 @@ set_opamrootdir() {
 #
 # On Windows (anything with a DiskuvOCamlHome environment variable) the system will be a local
 # Opam switch inside DiskuvOCamlHome/host-tools. Otherwise the system will be the global Opam switch
-# `diskuv-host-tools`.
+# `dkml`.
 #
 # Inputs:
 # - env:DiskuvOCamlHome - Typically you get this from `autodetect_dkmlvars || true`. It will not set
@@ -504,7 +504,7 @@ set_opamswitchdir_of_system() {
         set_opamswitchdir_of_system_SWITCHBASE_UNAMBIGUOUS="$set_opamswitchdir_of_system_SWITCHBASE"
     else
         set_opamswitchdir_of_system_SWITCHBASE="host-tools"
-        set_opamswitchdir_of_system_SWITCHBASE_UNAMBIGUOUS="diskuv-host-tools"
+        set_opamswitchdir_of_system_SWITCHBASE_UNAMBIGUOUS="dkml"
     fi
 
     # Set OPAMROOTDIR_BUILDHOST

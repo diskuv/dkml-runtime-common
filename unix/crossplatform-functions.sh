@@ -507,9 +507,9 @@ install_reproducible_common() {
     install_reproducible_common_BOOTSTRAPDIR=$DEPLOYDIR_UNIX/$SHARE_REPRODUCIBLE_BUILD_RELPATH/$BOOTSTRAPNAME
     "$DKMLSYS_INSTALL" -d "$install_reproducible_common_BOOTSTRAPDIR"
     install_reproducible_file .dkmlroot
-    install_reproducible_file vendor/dkml-runtime-common/all/emptytop/dune-project
-    install_reproducible_file vendor/dkml-runtime-common/unix/crossplatform-functions.sh
-    install_reproducible_file vendor/dkml-runtime-common/unix/_common_tool.sh
+    install_reproducible_file vendor/drc/all/emptytop/dune-project
+    install_reproducible_file vendor/drc/unix/crossplatform-functions.sh
+    install_reproducible_file vendor/drc/unix/_common_tool.sh
 }
 
 # Install any non-common files that go into your reproducible build.
@@ -789,13 +789,13 @@ install_reproducible_script_with_args() {
         printf "set -euf\n"
         # shellcheck disable=SC2016
         printf 'if [ "${DKML_BUILD_TRACE:-}" = ON ] && [ "${DKML_BUILD_TRACE_LEVEL:-0}" -ge 2 ]; then\n'
-        printf "  exec env TOPDIR=\"\$PWD/%s/vendor/dkml-runtime-common/all/emptytop\" bash -x %s " \
+        printf "  exec env TOPDIR=\"\$PWD/%s/vendor/drc/all/emptytop\" bash -x %s " \
             "$install_reproducible_script_with_args_BOOTSTRAPRELDIR" \
             "$install_reproducible_script_with_args_BOOTSTRAPRELDIR/$install_reproducible_script_with_args_SCRIPTFILE"
         escape_args_for_shell "$@"
         printf "\n"
         printf "else\n"
-        printf "  exec env TOPDIR=\"\$PWD/%s/vendor/dkml-runtime-common/all/emptytop\" %s " \
+        printf "  exec env TOPDIR=\"\$PWD/%s/vendor/drc/all/emptytop\" %s " \
             "$install_reproducible_script_with_args_BOOTSTRAPRELDIR" \
             "$install_reproducible_script_with_args_BOOTSTRAPRELDIR/$install_reproducible_script_with_args_SCRIPTFILE"
         escape_args_for_shell "$@"

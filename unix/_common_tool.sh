@@ -170,7 +170,7 @@ WORK=$(PATH=/usr/bin:/bin mktemp -d "$TMPPARENTDIR_BUILDHOST"/dkmlw.XXXXX)
 trap 'PATH=/usr/bin:/bin rm -rf "$WORK"' EXIT
 
 # shellcheck disable=SC1091
-. "$DKMLDIR/vendor/dkml-runtime-common/unix/crossplatform-functions.sh"
+. "$DKMLDIR/vendor/drc/unix/crossplatform-functions.sh"
 
 #####
 # BEGIN Opam
@@ -293,9 +293,9 @@ exec_in_platform() {
             fi
         fi
         if [ "${DKML_FEATUREFLAG_CMAKE_PLATFORM:-OFF}" = OFF ]; then
-            printf "%s\n" "exec '$DKMLDIR'/vendor/dkml-runtime-common/unix/_within_dev.sh -p '$_exec_dev_or_arch_helper_PLATFORM' -0 '${ACTUAL_PRE_HOOK_SINGLE:-}' -1 '${ACTUAL_PRE_HOOK_DOUBLE:-}' \\" > "$_exec_dev_or_arch_helper_CMDFILE"
+            printf "%s\n" "exec '$DKMLDIR'/vendor/drc/unix/_within_dev.sh -p '$_exec_dev_or_arch_helper_PLATFORM' -0 '${ACTUAL_PRE_HOOK_SINGLE:-}' -1 '${ACTUAL_PRE_HOOK_DOUBLE:-}' \\" > "$_exec_dev_or_arch_helper_CMDFILE"
         else
-            printf "%s\n" "exec '$DKMLDIR'/vendor/dkml-runtime-common/unix/_within_dev.sh -p '$_exec_dev_or_arch_helper_PLATFORM' -d '$STATEDIR' -u '$USERMODE' -0 '${ACTUAL_PRE_HOOK_SINGLE:-}' -1 '${ACTUAL_PRE_HOOK_DOUBLE:-}' \\" > "$_exec_dev_or_arch_helper_CMDFILE"
+            printf "%s\n" "exec '$DKMLDIR'/vendor/drc/unix/_within_dev.sh -p '$_exec_dev_or_arch_helper_PLATFORM' -d '$STATEDIR' -u '$USERMODE' -0 '${ACTUAL_PRE_HOOK_SINGLE:-}' -1 '${ACTUAL_PRE_HOOK_DOUBLE:-}' \\" > "$_exec_dev_or_arch_helper_CMDFILE"
         fi
     else
         # TODO: within-sandbox.sh is deprecated. We can use CMake and ExternalProject through Docker or WSL2 to

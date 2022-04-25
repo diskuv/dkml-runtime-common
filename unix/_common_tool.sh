@@ -463,14 +463,14 @@ set_opamrootdir() {
 # Select the '(diskuv-)(host|dksdk)-tools' switch.
 #
 # On Windows (anything with a DiskuvOCamlHome environment variable) the system will be a local
-# Opam switch inside DiskuvOCamlHome/host-tools. Otherwise the system will be the global Opam switch
+# Opam switch inside DiskuvOCamlHome/dkml. Otherwise the system will be the global Opam switch
 # `dkml`.
 #
 # Inputs:
 # - env:DiskuvOCamlHome - Typically you get this from `autodetect_dkmlvars || true`. It will not set
 #   the variable on non-Windows system, which is supported.
 # - env:DKSDK_INVOCATION - Optional. Defaults to OFF. If ON the name of the switch will end in dksdk-${DKML_HOST_ABI}
-#   rather than host-tools. The DKSDK system switch uses a system compiler rather than a base compiler, so
+#   rather than dkml. The DKSDK system switch uses a system compiler rather than a base compiler, so
 #   the switches must be segregated.
 # - env:USERMODE
 # - env:STATEDIR
@@ -493,7 +493,7 @@ set_opamswitchdir_of_system() {
     # !!!!!!!!!!!!!
     #
     # Do not change the behavior of this function without also
-    # changing diskuv-sdk > 140-opam-switch-host-tools > CMakeLists.txt.
+    # changing diskuv-sdk > 140-opam-switch-dkml > CMakeLists.txt.
 
     # Name the switch. Since there may be a zillion switches in the user's default
     # OPAMROOT (ie. USERMODE=ON), we have an unambiguous switch name that identifies
@@ -503,7 +503,7 @@ set_opamswitchdir_of_system() {
         set_opamswitchdir_of_system_SWITCHBASE="dksdk-$set_opamswitchdir_of_system_PLATFORM"
         set_opamswitchdir_of_system_SWITCHBASE_UNAMBIGUOUS="$set_opamswitchdir_of_system_SWITCHBASE"
     else
-        set_opamswitchdir_of_system_SWITCHBASE="host-tools"
+        set_opamswitchdir_of_system_SWITCHBASE="dkml"
         set_opamswitchdir_of_system_SWITCHBASE_UNAMBIGUOUS="dkml"
     fi
 

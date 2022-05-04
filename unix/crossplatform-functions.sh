@@ -498,7 +498,7 @@ is_arg_darwin_based_platform() {
 #
 # Inputs:
 #  env:DEPLOYDIR_UNIX - The deployment directory
-#  env:BOOTSTRAPNAME - Examples include: 110-compile-opam
+#  env:BOOTSTRAPNAME - Examples include: 110co
 #  env:DKMLDIR - The directory with .dkmlroot
 install_reproducible_common() {
     # Set DKMLSYS_*
@@ -517,7 +517,7 @@ install_reproducible_common() {
 #
 # Inputs:
 #  env:DEPLOYDIR_UNIX - The deployment directory
-#  env:BOOTSTRAPNAME - Examples include: 110-compile-opam
+#  env:BOOTSTRAPNAME - Examples include: 110co
 #  env:DKMLDIR - The directory with .dkmlroot
 #  $1 - The path of the script that will be installed.
 #       It will be deployed relative to $DEPLOYDIR_UNIX and it
@@ -559,7 +559,7 @@ install_reproducible_file() {
 #
 # Inputs:
 #  env:DEPLOYDIR_UNIX - The deployment directory
-#  env:BOOTSTRAPNAME - Examples include: 110-compile-opam
+#  env:BOOTSTRAPNAME - Examples include: 110co
 #  env:DKMLDIR - The directory with .dkmlroot
 #  $1 - The path to the generated script.
 #  $2 - The location of the script that will be installed.
@@ -587,7 +587,7 @@ install_reproducible_generated_file() {
 #
 # Inputs:
 #  env:DEPLOYDIR_UNIX - The deployment directory
-#  env:BOOTSTRAPNAME - Examples include: 110-compile-opam
+#  env:BOOTSTRAPNAME - Examples include: 110co
 #  env:DKMLDIR - The directory with .dkmlroot
 #  $1 - The path of the .md file that will be installed.
 #       It will be deployed as 'README.md' in the bootstrap folder of $DEPLOYDIR_UNIX and it
@@ -667,7 +667,7 @@ replace_all() {
 #
 # Inputs:
 #  env:DEPLOYDIR_UNIX - The deployment directory
-#  env:BOOTSTRAPNAME - Examples include: 110-compile-opam
+#  env:BOOTSTRAPNAME - Examples include: 110co
 #  env:DKMLDIR - The directory with .dkmlroot
 #  $1 - The path of the script that will be created, relative to $DEPLOYDIR_UNIX.
 #       Must end with `.sh`.
@@ -760,7 +760,7 @@ install_reproducible_system_packages() {
 #
 # Inputs:
 #  env:DEPLOYDIR_UNIX - The deployment directory
-#  env:BOOTSTRAPNAME - Examples include: 110-compile-opam
+#  env:BOOTSTRAPNAME - Examples include: 110co
 #  env:DKMLDIR - The directory with .dkmlroot
 #  $1 - The path of the pre-existing script that should be run.
 #       It will be deployed relative to $DEPLOYDIR_UNIX and it

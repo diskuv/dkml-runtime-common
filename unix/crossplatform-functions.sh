@@ -425,9 +425,10 @@ is_unixy_windows_build_machine() {
 # Is a MSYS2 environment with the MSYS or MINGW64 subsystem?
 # * MSYS2 can also do MinGW 32-bit and 64-bit subsystems. Used by Diskuv OCaml
 # * MINGW64 used by Git Bash (aka. GitHub Actions `shell: bash`)
+# https://www.msys2.org/docs/environments/
 is_msys2_msys_build_machine() {
     if [ -e /usr/bin/msys-2.0.dll ] && {
-        [ "${MSYSTEM:-}" = "MSYS" ] || [ "${MSYSTEM:-}" = "MINGW64" ]
+        [ "${MSYSTEM:-}" = "MSYS" ] || [ "${MSYSTEM:-}" = "MINGW64" ] || [ "${MSYSTEM:-}" = "UCRT64" ] || [ "${MSYSTEM:-}" = "CLANG64" ] || [ "${MSYSTEM:-}" = "MINGW32" ] || [ "${MSYSTEM:-}" = "CLANG32" ] || [ "${MSYSTEM:-}" = "CLANGARM64" ]
     }; then
         return 0
     fi

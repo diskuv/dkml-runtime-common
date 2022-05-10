@@ -819,8 +819,8 @@ autodetect_buildhost_arch() {
     # Set DKMLSYS_*
     autodetect_system_binaries
 
-    autodetect_buildhost_arch_MACHINE=$("$DKMLSYS_UNAME" -m)
     autodetect_buildhost_arch_SYSTEM=$("$DKMLSYS_UNAME" -s)
+    autodetect_buildhost_arch_MACHINE=$("$DKMLSYS_UNAME" -m)
     # list from https://en.wikipedia.org/wiki/Uname and https://stackoverflow.com/questions/45125516/possible-values-for-uname-m
     case "${autodetect_buildhost_arch_SYSTEM}-${autodetect_buildhost_arch_MACHINE}" in
         Linux-armv7*)

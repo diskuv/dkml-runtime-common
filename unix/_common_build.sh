@@ -81,9 +81,8 @@ USE_GLOBALLY_REGISTERED_LOCAL_SWITCHES_ON_WINDOWS=OFF
 #     The path to the switch **not including any _opam subfolder** that works as an argument to `exec_in_platform` -OR-
 #     The name of a global switch that represents the build directory.
 #     OPAMSWITCHNAME_EXPAND works inside or outside of a container.
-# - env:WITHDKMLEXE_BUILDHOST - The plugin binary 'with-dkml.exe'
 set_opamrootandswitchdir() {
-    # Set OPAMROOTDIR_BUILDHOST, OPAMROOTDIR_EXPAND and WITHDKMLEXE_BUILDHOST
+    # Set OPAMROOTDIR_BUILDHOST and OPAMROOTDIR_EXPAND
     set_opamrootdir
 
     if [ "$USE_GLOBALLY_REGISTERED_LOCAL_SWITCHES_ON_WINDOWS" = ON ] && is_unixy_windows_build_machine; then

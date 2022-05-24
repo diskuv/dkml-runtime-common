@@ -341,38 +341,57 @@ set_dksdkcachedir() {
 }
 
 # Sets the location of the opam executable.
-# Prefers ~/opt/opam/bin/opam{.exe}; otherwise looks in the PATH.
+# Prefers ~/opt/opam/bin/opam[-real]{.exe}; otherwise looks in the PATH. The
+# [-real] suffix is preferred the most.
 #
 # Inputs:
 # - env:OPAMHOME - If specified, use <OPAMHOME>/bin/opam or <OPAMHOME>/bin/opam.exe
 # Outputs:
 # - env:OPAMEXE - The location of opam or opam.exe
-# Return code: 0 if found; 1 if not found
+# Exits with non-zero exit code on error
 set_opamexe() {
     if [ -n "${OPAMHOME:-}" ]; then
-        if [ -e "$OPAMHOME/bin/opam.exe" ]; then
+        if [ -e "$OPAMHOME/bin/opam-real.exe" ]; then
+            OPAMEXE="$OPAMHOME/bin/opam-real.exe"
+            return
+        elif [ -e "$OPAMHOME/bin/opam-real" ]; then
+            OPAMEXE="$OPAMHOME/bin/opam-real"
+            return
+        elif [ -e "$OPAMHOME/bin/opam.exe" ]; then
             OPAMEXE="$OPAMHOME/bin/opam.exe"
             return
         elif [ -e "$OPAMHOME/bin/opam" ]; then
             OPAMEXE="$OPAMHOME/bin/opam"
             return
         else
-            printf "FATAL: OPAMHOME is %s yet %s/bin/opam{.exe} does not exist\n" "$OPAMHOME" "$OPAMHOME"
+            printf "FATAL: OPAMHOME is %s yet %s/bin/opam[-real]{.exe} does not exist\n" "$OPAMHOME" "$OPAMHOME"
             exit 107
         fi
     fi
-    if [ -e "$HOME/opt/opam/bin/opam.exe" ]; then
+    if [ -e "$HOME/opt/opam/bin/opam-real.exe" ]; then
+        OPAMEXE="$HOME/opt/opam/bin/opam-real.exe"
+        return
+    elif [ -e "$HOME/opt/opam/bin/opam-real" ]; then
+        OPAMEXE="$HOME/opt/opam/bin/opam-real"
+        return
+    elif [ -e "$HOME/opt/opam/bin/opam.exe" ]; then
         OPAMEXE="$HOME/opt/opam/bin/opam.exe"
         return
     elif [ -e "$HOME/opt/opam/bin/opam" ]; then
         OPAMEXE="$HOME/opt/opam/bin/opam"
         return
     fi
+    set_opamexe_EXE=$(command -v opam-real 2>/dev/null || true)
+    if [ -n "$set_opamexe_EXE" ]; then
+        # shellcheck disable=SC2034
+        OPAMEXE="$set_opamexe_EXE"
+        return
+    fi
     set_opamexe_EXE=$(command -v opam 2>/dev/null || true)
     if [ -n "$set_opamexe_EXE" ]; then
         # shellcheck disable=SC2034
         OPAMEXE="$set_opamexe_EXE"
-        return 0
+        return
     fi
     # Not found
     printf "FATAL: Opam was not found. Please follow https://opam.ocaml.org/doc/Install.html\n"

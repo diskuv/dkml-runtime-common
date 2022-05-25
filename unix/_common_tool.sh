@@ -214,11 +214,6 @@ exec_in_platform() {
         printf "  -c" >> "$_exec_dev_or_arch_helper_CMDARGS"
     fi
 
-    if [ -x /usr/bin/cygpath ]; then
-        _exec_dev_or_arch_helper_ACTUALTOPDIR=$(/usr/bin/cygpath -aw "$TOPDIR")
-    else
-        _exec_dev_or_arch_helper_ACTUALTOPDIR="$TOPDIR"
-    fi
     for _exec_dev_or_arch_helper_ARG in "$@"; do
         printf "%s\n  '%s'" " \\" "$_exec_dev_or_arch_helper_ARG" >> "$_exec_dev_or_arch_helper_CMDARGS"
     done

@@ -98,13 +98,6 @@ LAUNCHER_ARGS=()
 # described at https://www.msys2.org/docs/filesystem-paths/
 disambiguate_filesystem_paths
 
-# If and only if [-b DKML_DUNE_BUILD_DIR] specified
-if [ -n "${DKML_DUNE_BUILD_DIR:-}" ]; then
-    LAUNCHER_ARGS+=(
-        DKML_DUNE_BUILD_DIR="$DKML_DUNE_BUILD_DIR"
-    )
-fi
-
 # Autodetect DKMLSYS_*
 autodetect_system_binaries
 

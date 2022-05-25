@@ -247,7 +247,7 @@ exec_in_platform() {
     _exec_dev_or_arch_helper_DKMLPLATFORM="$1"
     shift
     if [ "$_exec_dev_or_arch_helper_DKMLPLATFORM" = dev ]; then
-        printf "FATAL: exec_in_platform() must not have DKMLPLATFORM=dev\n" >&2
+        printf "FATAL: exec_in_platform() must not have DKMLABI=dev\n" >&2
         exit 107
     fi
 

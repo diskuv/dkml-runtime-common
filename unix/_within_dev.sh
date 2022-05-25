@@ -14,7 +14,7 @@ usage() {
     printf "%s\n" "       -u ON|OFF: User mode. Currently unused except to influence the temporary directory, but passthrough the user mode of the calling script" >&2
     printf "%s\n" "       -d STATEDIR: State directory. Currently unused except to influence the temporary directory, but passthrough the user mode of the calling script" >&2
     printf "%s\n" "Advanced Options:" >&2
-    printf "%s\n" "   -p DKMLPLATFORM: Optional. The DKML ABI. Defaults to an auto-detected host ABI" >&2
+    printf "%s\n" "   -p DKMLABI: Optional. The DKML ABI. Defaults to an auto-detected host ABI" >&2
     printf "%s\n" "   -c: If specified, compilation flags like CC are added to the environment." >&2
     printf "%s\n" "         This can take several seconds on Windows since vcdevcmd.bat needs to run" >&2
     printf "%s\n" "   -0 PREHOOK_SINGLE: If specified, the script will be 'eval'-d upon" >&2
@@ -28,7 +28,7 @@ usage() {
     printf "%s\n" '         Useful for setting environment variables (possibly from a script).' >&2
 }
 
-DKMLPLATFORM=
+DKMLABI=
 PREHOOK_SINGLE=
 PREHOOK_DOUBLE=
 COMPILATION=OFF
@@ -41,8 +41,8 @@ while getopts ":hp:0:1:cu:d:" opt; do
             exit 0
         ;;
         p )
-            DKMLPLATFORM=$OPTARG
-            if [ "$DKMLPLATFORM" = dev ]; then
+            DKMLABI=$OPTARG
+            if [ "$DKMLABI" = dev ]; then
                 usage
                 exit 0
             fi
@@ -198,7 +198,7 @@ if [ "$COMPILATION" = ON ]; then
     # shellcheck disable=SC2154
     if [ -z "${OPAM_SWITCH_PREFIX:-}" ] || [ ! -e "$OPAM_SWITCH_PREFIX/$OPAM_CACHE_SUBDIR/$WRAP_COMMANDS_CACHE_KEY" ]; then
         set +e
-        DKML_TARGET_ABI=$DKMLPLATFORM autodetect_compiler "$LAUNCHER"
+        DKML_TARGET_ABI=$DKMLABI autodetect_compiler "$LAUNCHER"
         EXITCODE=$?
         set -e
         if [ $EXITCODE -ne 0 ]; then

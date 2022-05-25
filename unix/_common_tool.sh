@@ -101,6 +101,9 @@ OPAM_CACHE_SUBDIR=.dkml/opam-cache
 # shellcheck disable=SC2034
 WRAP_COMMANDS_CACHE_KEY=wrap-commands."$dkml_root_version"
 
+# shellcheck disable=SC1091
+. "$DKMLDIR/vendor/drc/unix/crossplatform-functions.sh"
+
 # Temporary directory that needs to be accessible inside and outside of containers so shell scripts
 # can be sent from the outside of a container into a container.
 # So we make $WORK be a subdirectory of $STATEDIR.
@@ -110,9 +113,6 @@ if [ "$__USERMODE" = OFF ]; then
 fi
 create_workdir
 trap 'PATH=/usr/bin:/bin rm -rf "$WORK"' EXIT
-
-# shellcheck disable=SC1091
-. "$DKMLDIR/vendor/drc/unix/crossplatform-functions.sh"
 
 #####
 # BEGIN Opam

@@ -10,50 +10,42 @@ set -euf
 usage() {
     printf "%s\n" "Usage:" >&2
     printf "%s\n" "    within-dev.sh -h                          Display this help message." >&2
-    printf "%s\n" "    within-dev.sh [-p PLATFORM] [-b BUILDTYPE] command ...  (Deprecated) Run the command and any arguments in the dev platform." >&2
-    printf "%s\n" "       -p PLATFORM: The target platform used. Defaults to 'dev'. DKML_TOOLS_DIR and DKML_DUNE_BUILD_DIR will be based on this" >&2
-    printf "%s\n" "       -b BUILDTYPE: If specified, will set DKML_DUNE_BUILD_DIR in the dev platform" >&2
     printf "%s\n" "    within-dev.sh -d STATEDIR [-u OFF] command ...  Run the command and any arguments in the environment of STATEDIR." >&2
     printf "%s\n" "       -u ON|OFF: User mode. Currently unused except to influence the temporary directory, but passthrough the user mode of the calling script" >&2
     printf "%s\n" "       -d STATEDIR: State directory. Currently unused except to influence the temporary directory, but passthrough the user mode of the calling script" >&2
     printf "%s\n" "Advanced Options:" >&2
-    printf "%s\n" "    -p DKMLPLATFORM: The DKML platform for the tools" >&2
-    printf "%s\n" "       -c: If specified, compilation flags like CC are added to the environment." >&2
-    printf "%s\n" "             This can take several seconds on Windows since vcdevcmd.bat needs to run" >&2
-    printf "%s\n" "       -0 PREHOOK_SINGLE: If specified, the script will be 'eval'-d upon" >&2
-    printf "%s\n" "             entering the Build Sandbox _before_ any the opam command is run." >&2
-    printf "%s\n" "       -1 PREHOOK_DOUBLE: If specified, the Bash statements will be 'eval'-d, 'dos2unix'-d and 'eval'-d" >&2
-    printf "%s\n" "             upon entering the Build Sandbox _before_ any other commands are run but" >&2
-    printf "%s\n" "             _after_ the PATH has been established." >&2
-    printf "%s\n" "             It behaves similar to:" >&2
-    echo '               eval "the PREHOOK_DOUBLE you gave" > /tmp/eval.sh' >&2
-    echo '               eval /tmp/eval.sh' >&2
-    echo '             Useful for setting environment variables (possibly from a script).' >&2
+    printf "%s\n" "   -p DKMLPLATFORM: Optional. The DKML ABI. Defaults to an auto-detected host ABI" >&2
+    printf "%s\n" "   -c: If specified, compilation flags like CC are added to the environment." >&2
+    printf "%s\n" "         This can take several seconds on Windows since vcdevcmd.bat needs to run" >&2
+    printf "%s\n" "   -0 PREHOOK_SINGLE: If specified, the script will be 'eval'-d upon" >&2
+    printf "%s\n" "         entering the Build Sandbox _before_ any the opam command is run." >&2
+    printf "%s\n" "   -1 PREHOOK_DOUBLE: If specified, the Bash statements will be 'eval'-d, 'dos2unix'-d and 'eval'-d" >&2
+    printf "%s\n" "         upon entering the Build Sandbox _before_ any other commands are run but" >&2
+    printf "%s\n" "         _after_ the PATH has been established." >&2
+    printf "%s\n" "         It behaves similar to:" >&2
+    printf "%s\n" '           eval "the PREHOOK_DOUBLE you gave" > /tmp/eval.sh' >&2
+    printf "%s\n" '           eval /tmp/eval.sh' >&2
+    printf "%s\n" '         Useful for setting environment variables (possibly from a script).' >&2
 }
 
-PLATFORM=
-BUILDTYPE=
+DKMLPLATFORM=
 PREHOOK_SINGLE=
 PREHOOK_DOUBLE=
 COMPILATION=OFF
 STATEDIR=
 USERMODE=ON
-while getopts ":hb:p:0:1:cu:d:" opt; do
+while getopts ":hp:0:1:cu:d:" opt; do
     case ${opt} in
         h )
             usage
             exit 0
         ;;
         p )
-            PLATFORM=$OPTARG
-            if [ "$PLATFORM" = dev ]; then
+            DKMLPLATFORM=$OPTARG
+            if [ "$DKMLPLATFORM" = dev ]; then
                 usage
                 exit 0
             fi
-        ;;
-        b )
-            # shellcheck disable=SC2034
-            BUILDTYPE=$OPTARG
         ;;
         0 )
             PREHOOK_SINGLE=$OPTARG
@@ -213,7 +205,7 @@ if [ "$COMPILATION" = ON ]; then
     # shellcheck disable=SC2154
     if [ -z "${OPAM_SWITCH_PREFIX:-}" ] || [ ! -e "$OPAM_SWITCH_PREFIX/$OPAM_CACHE_SUBDIR/$WRAP_COMMANDS_CACHE_KEY" ]; then
         set +e
-        DKML_TARGET_ABI=$PLATFORM autodetect_compiler "$LAUNCHER"
+        DKML_TARGET_ABI=$DKMLPLATFORM autodetect_compiler "$LAUNCHER"
         EXITCODE=$?
         set -e
         if [ $EXITCODE -ne 0 ]; then

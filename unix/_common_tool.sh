@@ -215,9 +215,8 @@ set_ocaml_variant_for_windows_switches() {
 # reproducible sandbox corresponding to `$PLATFORM`
 # which must be defined.
 #
-# When the optional `$BUILDTYPE` is non-empty the build type and
-# corresponding environment variables (`DK_BUILD_TYPE`) will
-# be available in the platform.
+# Usage: [options] DKML_PLATFORM
+#   DKML_PLATFORM         - which platform to run in (not "dev")
 #
 # Options:
 #   -c                    - Optional. If enabled then compilation environment variables
@@ -225,8 +224,6 @@ set_ocaml_variant_for_windows_switches() {
 #                           time-consuming, especially on Windows which needs to call
 #                           VsDevCmd.bat
 # Inputs:
-#   env:PLATFORM          - (deprecated) optional. which platform to run in
-#   env:BUILDTYPE         - optional
 #   env:PLATFORM_EXEC_PRE_SINGLE - optional. acts as hook.
 #                           the specified bash statements, if any, are 'eval'-d _before_ the
 #                           command line arguments are executed.
@@ -239,12 +236,6 @@ set_ocaml_variant_for_windows_switches() {
 #                             eval "$PLATFORM_EXEC_PRE_DOUBLE" | dos2unix > /tmp/eval.sh
 #                             eval /tmp/eval.sh
 #   $@                    - the command line arguments that will be executed
-#
-# (Deprecated functionality) The text of the arguments $@, PLATFORM_EXEC_PRE_SINGLE and
-# PLATFORM_EXEC_PRE_DOUBLE have their macros expanded:
-#
-#   @@EXPAND_TOPDIR@@: The top project directory containing `dune-project`.
-#     When running in MSYS2 the directory will be Windows style (ex. C:\)
 exec_in_platform() {
     # option parsing
     if [ "$1" = "-c" ]; then
@@ -253,77 +244,36 @@ exec_in_platform() {
     else
         _exec_dev_or_arch_helper_COMPILATION=OFF
     fi
-    _exec_dev_or_arch_helper_PLATFORM=${PLATFORM:-}
-    if [ ! "${DKML_FEATUREFLAG_CMAKE_PLATFORM:-OFF}" = OFF ] && [ "$_exec_dev_or_arch_helper_PLATFORM" = dev ]; then
-        printf "FATAL: exec_in_platform() must not have PLATFORM=dev\n" >&2
+    _exec_dev_or_arch_helper_DKMLPLATFORM="$1"
+    shift
+    if [ "$_exec_dev_or_arch_helper_DKMLPLATFORM" = dev ]; then
+        printf "FATAL: exec_in_platform() must not have DKMLPLATFORM=dev\n" >&2
         exit 107
     fi
 
     _exec_dev_or_arch_helper_CMDFILE="$WORK"/_exec_dev_or_arch_helper-cmdfile.sh
     _exec_dev_or_arch_helper_CMDARGS="$WORK"/_exec_dev_or_arch_helper-cmdfile.args
     true > "$_exec_dev_or_arch_helper_CMDARGS"
-    if [ -n "${BUILDTYPE:-}" ]; then
-        printf "  -b %s" "$BUILDTYPE" >> "$_exec_dev_or_arch_helper_CMDARGS"
-    fi
     if [ "${_exec_dev_or_arch_helper_COMPILATION:-}" = ON ]; then
         printf "  -c" >> "$_exec_dev_or_arch_helper_CMDARGS"
     fi
-    if [ ! "${DKML_FEATUREFLAG_CMAKE_PLATFORM:-OFF}" = OFF ] || is_dev_platform || ! is_arg_linux_based_platform "$_exec_dev_or_arch_helper_PLATFORM"; then
-        if [ -x /usr/bin/cygpath ]; then
-            _exec_dev_or_arch_helper_ACTUALTOPDIR=$(/usr/bin/cygpath -aw "$TOPDIR")
-        else
-            _exec_dev_or_arch_helper_ACTUALTOPDIR="$TOPDIR"
-        fi
-        for _exec_dev_or_arch_helper_ARG in "$@"; do
-            if [ "${DKML_FEATUREFLAG_CMAKE_PLATFORM:-OFF}" = OFF ]; then
-                _exec_dev_or_arch_helper_ARG=$(replace_all "${_exec_dev_or_arch_helper_ARG}" @@EXPAND_TOPDIR@@ "${_exec_dev_or_arch_helper_ACTUALTOPDIR}")
-            fi
-            printf "%s\n  '%s'" " \\" "$_exec_dev_or_arch_helper_ARG" >> "$_exec_dev_or_arch_helper_CMDARGS"
-        done
-        if [ -n "${PLATFORM_EXEC_PRE_SINGLE:-}" ]; then
-            ACTUAL_PRE_HOOK_SINGLE="$PLATFORM_EXEC_PRE_SINGLE"
-            if [ "${DKML_FEATUREFLAG_CMAKE_PLATFORM:-OFF}" = OFF ]; then
-                ACTUAL_PRE_HOOK_SINGLE=$(replace_all "${ACTUAL_PRE_HOOK_SINGLE}" @@EXPAND_TOPDIR@@ "${_exec_dev_or_arch_helper_ACTUALTOPDIR}")
-            fi
-        fi
-        if [ -n "${PLATFORM_EXEC_PRE_DOUBLE:-}" ]; then
-            ACTUAL_PRE_HOOK_DOUBLE="$PLATFORM_EXEC_PRE_DOUBLE"
-            if [ "${DKML_FEATUREFLAG_CMAKE_PLATFORM:-OFF}" = OFF ]; then
-                ACTUAL_PRE_HOOK_DOUBLE=$(replace_all "${ACTUAL_PRE_HOOK_DOUBLE}" @@EXPAND_TOPDIR@@ "${_exec_dev_or_arch_helper_ACTUALTOPDIR}")
-            fi
-        fi
-        if [ "${DKML_FEATUREFLAG_CMAKE_PLATFORM:-OFF}" = OFF ]; then
-            printf "%s\n" "exec '$DKMLDIR'/vendor/drc/unix/_within_dev.sh -p '$_exec_dev_or_arch_helper_PLATFORM' -0 '${ACTUAL_PRE_HOOK_SINGLE:-}' -1 '${ACTUAL_PRE_HOOK_DOUBLE:-}' \\" > "$_exec_dev_or_arch_helper_CMDFILE"
-        else
-            printf "%s\n" "exec '$DKMLDIR'/vendor/drc/unix/_within_dev.sh -p '$_exec_dev_or_arch_helper_PLATFORM' -d '$STATEDIR' -u '$USERMODE' -0 '${ACTUAL_PRE_HOOK_SINGLE:-}' -1 '${ACTUAL_PRE_HOOK_DOUBLE:-}' \\" > "$_exec_dev_or_arch_helper_CMDFILE"
-        fi
+
+    if [ -x /usr/bin/cygpath ]; then
+        _exec_dev_or_arch_helper_ACTUALTOPDIR=$(/usr/bin/cygpath -aw "$TOPDIR")
     else
-        # TODO: within-sandbox.sh is deprecated. We can use CMake and ExternalProject through Docker or WSL2 to
-        # do much of the same more cleanly.
-        for _exec_dev_or_arch_helper_ARG in "$@"; do
-            if [ "${DKML_FEATUREFLAG_CMAKE_PLATFORM:-OFF}" = OFF ]; then
-                _exec_dev_or_arch_helper_ARG=$(replace_all "${_exec_dev_or_arch_helper_ARG}" @@EXPAND_TOPDIR@@ "/work")
-            fi
-            printf "%s\n  '%s'" " \\" "$_exec_dev_or_arch_helper_ARG" >> "$_exec_dev_or_arch_helper_CMDARGS"
-        done
-        if [ -n "${PLATFORM_EXEC_PRE_SINGLE:-}" ]; then
-            ACTUAL_PRE_HOOK_SINGLE="$PLATFORM_EXEC_PRE_SINGLE"
-            if [ "${DKML_FEATUREFLAG_CMAKE_PLATFORM:-OFF}" = OFF ]; then
-                ACTUAL_PRE_HOOK_SINGLE=$(replace_all "${ACTUAL_PRE_HOOK_SINGLE}" @@EXPAND_TOPDIR@@ "/work")
-            fi
-        fi
-        if [ -n "${PLATFORM_EXEC_PRE_DOUBLE:-}" ]; then
-            ACTUAL_PRE_HOOK_DOUBLE="$PLATFORM_EXEC_PRE_DOUBLE"
-            if [ "${DKML_FEATUREFLAG_CMAKE_PLATFORM:-OFF}" = OFF ]; then
-                ACTUAL_PRE_HOOK_DOUBLE=$(replace_all "${ACTUAL_PRE_HOOK_DOUBLE}" @@EXPAND_TOPDIR@@ "/work")
-            fi
-        fi
-        if [ "${DKML_FEATUREFLAG_CMAKE_PLATFORM:-OFF}" = OFF ]; then
-            printf "%s\n" "exec '$DKMLDIR'/runtime/unix/within-sandbox.sh -p '$_exec_dev_or_arch_helper_PLATFORM' -0 '${ACTUAL_PRE_HOOK_SINGLE:-}' -1 '${ACTUAL_PRE_HOOK_DOUBLE:-}' \\" > "$_exec_dev_or_arch_helper_CMDFILE"
-        else
-            printf "%s\n" "exec '$DKMLDIR'/runtime/unix/within-sandbox.sh -p '$_exec_dev_or_arch_helper_PLATFORM' -d '$STATEDIR' -u '$USERMODE' -0 '${ACTUAL_PRE_HOOK_SINGLE:-}' -1 '${ACTUAL_PRE_HOOK_DOUBLE:-}' \\" > "$_exec_dev_or_arch_helper_CMDFILE"
-        fi
+        _exec_dev_or_arch_helper_ACTUALTOPDIR="$TOPDIR"
     fi
+    for _exec_dev_or_arch_helper_ARG in "$@"; do
+        printf "%s\n  '%s'" " \\" "$_exec_dev_or_arch_helper_ARG" >> "$_exec_dev_or_arch_helper_CMDARGS"
+    done
+    if [ -n "${PLATFORM_EXEC_PRE_SINGLE:-}" ]; then
+        ACTUAL_PRE_HOOK_SINGLE="$PLATFORM_EXEC_PRE_SINGLE"
+    fi
+    if [ -n "${PLATFORM_EXEC_PRE_DOUBLE:-}" ]; then
+        ACTUAL_PRE_HOOK_DOUBLE="$PLATFORM_EXEC_PRE_DOUBLE"
+    fi
+    printf "%s\n" "exec '$DKMLDIR'/vendor/drc/unix/_within_dev.sh -p '$_exec_dev_or_arch_helper_DKMLPLATFORM' -d '$STATEDIR' -u '$USERMODE' -0 '${ACTUAL_PRE_HOOK_SINGLE:-}' -1 '${ACTUAL_PRE_HOOK_DOUBLE:-}' \\" > "$_exec_dev_or_arch_helper_CMDFILE"
+
     cat "$_exec_dev_or_arch_helper_CMDARGS" >> "$_exec_dev_or_arch_helper_CMDFILE"
 
     log_shell "$_exec_dev_or_arch_helper_CMDFILE"
@@ -438,7 +388,7 @@ set_opamrootdir() {
             OPAMROOTDIR_BUILDHOST=$($OPAMEXE var --global root 2>/dev/null || true)
             if [ -z "$OPAMROOTDIR_BUILDHOST" ]; then
                 # Opam is not initialized. We probably got:
-                #   [ERROR] Opam has not been initialised, please run `opam init'                
+                #   [ERROR] Opam has not been initialised, please run `opam init'
                 # So conform to https://github.com/ocaml/opam/pull/4815#issuecomment-910137754
                 set_opamrootdir_VER=$($OPAMEXE --version)
                 case "$set_opamrootdir_VER" in

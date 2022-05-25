@@ -2378,3 +2378,28 @@ spawn_rsync() {
         fi
     fi
 }
+
+# Make a work directory. It is your responsibility to setup a trap as in:
+#   trap 'PATH=/usr/bin:/bin rm -rf "$WORK"' EXIT
+# Inputs:
+#   env:TMPPARENTDIR_BUILDHOST : Optional. If set then it will be used as the
+#   parent directory of the work directory.
+# Outputs:
+#   env:WORK : The work directory
+create_workdir() {
+    # Our use of mktemp needs to be portable; docs at:
+    # * BSD: https://www.freebsd.org/cgi/man.cgi?query=mktemp&sektion=1
+    # * GNU: https://www.gnu.org/software/autogen/mktemp.html
+    if [ -n "${_CS_DARWIN_USER_TEMP_DIR:-}" ]; then # macOS (see `man mktemp`)
+        make_workdir_DEFAULT="$_CS_DARWIN_USER_TEMP_DIR"
+    elif [ -n "${TMPDIR:-}" ]; then # macOS (see `man mktemp`)
+        make_workdir_DEFAULT=$(printf "%s" "$TMPDIR" | PATH=/usr/bin:/bin sed 's#/$##') # remove trailing slash on macOS
+    elif [ -n "${TMP:-}" ]; then # MSYS2 (Windows), Linux
+        make_workdir_DEFAULT="$TMP"
+    else
+        make_workdir_DEFAULT="/tmp"
+    fi
+    TMPPARENTDIR_BUILDHOST="${TMPPARENTDIR_BUILDHOST:-$make_workdir_DEFAULT}"
+    [ ! -e "$TMPPARENTDIR_BUILDHOST" ] && install -d "$TMPPARENTDIR_BUILDHOST"
+    WORK=$(PATH=/usr/bin:/bin mktemp -d "$TMPPARENTDIR_BUILDHOST"/dkmlw.XXXXX)
+}

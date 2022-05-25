@@ -103,26 +103,12 @@ WRAP_COMMANDS_CACHE_KEY=wrap-commands."$dkml_root_version"
 
 # Temporary directory that needs to be accessible inside and outside of containers so shell scripts
 # can be sent from the outside of a container into a container.
-# So we make $WORK be a subdirectory of $TOPDIR.
-# TODO: We could instead mount TMPPARENTDIR_BUILDHOST or WORK in sandbox so we can always use /tmp;
-#       Cygwin in particular has absolute file path length limitations.
-# Our use of mktemp needs to be portable; docs at:
-# * BSD: https://www.freebsd.org/cgi/man.cgi?query=mktemp&sektion=1
-# * GNU: https://www.gnu.org/software/autogen/mktemp.html
+# So we make $WORK be a subdirectory of $STATEDIR.
 if [ "$__USERMODE" = OFF ]; then
-    TMPPARENTDIR_ABS_OR_RELTOP="$STATEDIR/tmp"
-elif [ -n "${_CS_DARWIN_USER_TEMP_DIR:-}" ]; then # macOS (see `man mktemp`)
-    TMPPARENTDIR_ABS_OR_RELTOP="$_CS_DARWIN_USER_TEMP_DIR"
-elif [ -n "${TMPDIR:-}" ]; then # macOS (see `man mktemp`)
-    TMPPARENTDIR_ABS_OR_RELTOP=$(printf "%s" "$TMPDIR" | PATH=/usr/bin:/bin sed 's#/$##') # remove trailing slash on macOS
-elif [ -n "${TMP:-}" ]; then # MSYS2 (Windows), Linux
-    TMPPARENTDIR_ABS_OR_RELTOP="$TMP"
-else
-    TMPPARENTDIR_ABS_OR_RELTOP="/tmp"
+    # shellcheck disable=SC2034
+    TMPPARENTDIR_BUILDHOST="$STATEDIR/tmp"
 fi
-TMPPARENTDIR_BUILDHOST="${TMPPARENTDIR_BUILDHOST:-$TMPPARENTDIR_ABS_OR_RELTOP}"
-[ ! -e "$TMPPARENTDIR_BUILDHOST" ] && install -d "$TMPPARENTDIR_BUILDHOST"
-WORK=$(PATH=/usr/bin:/bin mktemp -d "$TMPPARENTDIR_BUILDHOST"/dkmlw.XXXXX)
+create_workdir
 trap 'PATH=/usr/bin:/bin rm -rf "$WORK"' EXIT
 
 # shellcheck disable=SC1091

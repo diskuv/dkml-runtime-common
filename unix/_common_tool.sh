@@ -92,47 +92,14 @@ else
     OS_DIR_SEP=/
 fi
 
-# Backwards compatible user mode
-if [ "${DKML_FEATUREFLAG_CMAKE_PLATFORM:-OFF}" = OFF ]; then
-    __USERMODE=OFF
-else
-    # shellcheck disable=SC2153
-    __USERMODE="$USERMODE" # fails if USERMODE not set
-fi
+# shellcheck disable=SC2153
+__USERMODE="$USERMODE" # fails if USERMODE not set
 
 # Set OPAM_CACHE_SUBDIR and cache keys like WRAP_COMMANDS_KEY
 # shellcheck disable=SC2034
 OPAM_CACHE_SUBDIR=.dkml/opam-cache
 # shellcheck disable=SC2034
 WRAP_COMMANDS_CACHE_KEY=wrap-commands."$dkml_root_version"
-
-# (Deprecated; modern version in _common_build.sh)
-# The build root is where all the build files go (except _build for Dune in dev platform). Ordinarily it is a relative
-# directory but can be overridden with DKML_BUILD_ROOT to be an absolute path.
-# For Windows you want to use it so that you do not run into 260 character absolute path limits!
-# Here is an example of a 260 character limit violation ... it is VERY HARD to see what the problem is!
-#   $ (cd _build/default && D:\a\diskuv-ocaml-starter-ghmirror\diskuv-ocaml-starter-ghmirror\build\windows_x86_64\Release\_opam\bin\ocamlc.opt.exe -w -40 -g -bin-annot -I expander/.ppx_sexp_conv_expander.objs/byte -I D:/a/diskuv-ocaml-starter-ghmirror/diskuv-ocaml-starter-ghmirror/build/windows_x86_64/Release/_opam/lib/ocaml\compiler-libs -I D:\a\diskuv-ocaml-starter-ghmirror\diskuv-ocaml-starter-ghmirror\build\windows_x86_64\Release\_opam\lib\base -I D:\a\diskuv-ocaml-starter-ghmirror\diskuv-ocaml-starter-ghmirror\build\windows_x86_64\Release\_opam\lib\base\base_internalhash_types -I D:\a\diskuv-ocaml-starter-ghmirror\diskuv-ocaml-starter-ghmirror\build\windows_x86_64\Release\_opam\lib\base\caml -I D:\a\diskuv-ocaml-starter-ghmirror\diskuv-ocaml-starter-ghmirror\build\windows_x86_64\Release\_opam\lib\base\shadow_stdlib -I D:\a\diskuv-ocaml-starter-ghmirror\diskuv-ocaml-starter-ghmirror\build\windows_x86_64\Release\_opam\lib\ocaml-compiler-libs\common -I D:\a\diskuv-ocaml-starter-ghmirror\diskuv-ocaml-starter-ghmirror\build\windows_x86_64\Release\_opam\lib\ocaml-compiler-libs\shadow -I D:\a\diskuv-ocaml-starter-ghmirror\diskuv-ocaml-starter-ghmirror\build\windows_x86_64\Release\_opam\lib\ocaml-migrate-parsetree -I D:\a\diskuv-ocaml-starter-ghmirror\diskuv-ocaml-starter-ghmirror\build\windows_x86_64\Release\_opam\lib\ppx_derivers -I D:\a\diskuv-ocaml-starter-ghmirror\diskuv-ocaml-starter-ghmirror\build\windows_x86_64\Release\_opam\lib\ppxlib -I D:\a\diskuv-ocaml-starter-ghmirror\diskuv-ocaml-starter-ghmirror\build\windows_x86_64\Release\_opam\lib\ppxlib\ast -I D:\a\diskuv-ocaml-starter-ghmirror\diskuv-ocaml-starter-ghmirror\build\windows_x86_64\Release\_opam\lib\ppxlib\metaquot_lifters -I D:\a\diskuv-ocaml-starter-ghmirror\diskuv-ocaml-starter-ghmirror\build\windows_x86_64\Release\_opam\lib\ppxlib\print_diff -I D:\a\diskuv-ocaml-starter-ghmirror\diskuv-ocaml-starter-ghmirror\build\windows_x86_64\Release\_opam\lib\ppxlib\stdppx -I D:\a\diskuv-ocaml-starter-ghmirror\diskuv-ocaml-starter-ghmirror\build\windows_x86_64\Release\_opam\lib\ppxlib\traverse_builtins -I D:\a\diskuv-ocaml-starter-ghmirror\diskuv-ocaml-starter-ghmirror\build\windows_x86_64\Release\_opam\lib\sexplib0 -I D:\a\diskuv-ocaml-starter-ghmirror\diskuv-ocaml-starter-ghmirror\build\windows_x86_64\Release\_opam\lib\stdlib-shims -no-alias-deps -open Ppx_sexp_conv_expander__ -o expander/.ppx_sexp_conv_expander.objs/byte/ppx_sexp_conv_expander__Str_generate_sexp_grammar.cmi -c -intf expander/str_generate_sexp_grammar.pp.mli)
-#   File "expander/str_generate_sexp_grammar.mli", line 1:
-#   Error: I/O error: expander/.ppx_sexp_conv_expander.objs/byte\ppx_sexp_conv_expander__Str_generate_sexp_grammar.cmi9d73bb.tmp: No such file or directory
-if [ "${DKML_FEATUREFLAG_CMAKE_PLATFORM:-OFF}" = OFF ]; then
-    BUILD_ROOT_UNIX="${DKML_BUILD_ROOT:-build}"
-    if [ -x /usr/bin/cygpath ]; then
-        BUILD_ROOT_UNIX=$(/usr/bin/cygpath -u "$BUILD_ROOT_UNIX")
-    fi
-    case "$BUILD_ROOT_UNIX" in
-    /* | ?:*) # /a/b/c or C:\Windows
-        BUILD_BASEPATH=
-        ;;
-    *)
-        # BUILD_BASEPATH will have a trailing slash
-        if [ -x /usr/bin/cygpath ]; then
-            BUILD_BASEPATH=$(/usr/bin/cygpath -u "$TOPDIR")/
-        else
-            BUILD_BASEPATH="$TOPDIR"/
-        fi
-        ;;
-    esac
-fi
 
 # Temporary directory that needs to be accessible inside and outside of containers so shell scripts
 # can be sent from the outside of a container into a container.
@@ -142,29 +109,18 @@ fi
 # Our use of mktemp needs to be portable; docs at:
 # * BSD: https://www.freebsd.org/cgi/man.cgi?query=mktemp&sektion=1
 # * GNU: https://www.gnu.org/software/autogen/mktemp.html
-if [ "${DKML_FEATUREFLAG_CMAKE_PLATFORM:-OFF}" = OFF ]; then
-    if [ -z "$BUILD_BASEPATH" ]; then
-        # BUILD_ROOT_UNIX is absolute path
-        TMPPARENTDIR_ABS_OR_RELTOP="$BUILD_ROOT_UNIX/_tmp"
-        TMPPARENTDIR_BUILDHOST="${TMPPARENTDIR_BUILDHOST:-$TMPPARENTDIR_ABS_OR_RELTOP}"
-    else
-        TMPPARENTDIR_ABS_OR_RELTOP="build/_tmp"
-        TMPPARENTDIR_BUILDHOST="${TMPPARENTDIR_BUILDHOST:-$BUILD_BASEPATH$TMPPARENTDIR_ABS_OR_RELTOP}"
-    fi
+if [ "$__USERMODE" = OFF ]; then
+    TMPPARENTDIR_ABS_OR_RELTOP="$STATEDIR/tmp"
+elif [ -n "${_CS_DARWIN_USER_TEMP_DIR:-}" ]; then # macOS (see `man mktemp`)
+    TMPPARENTDIR_ABS_OR_RELTOP="$_CS_DARWIN_USER_TEMP_DIR"
+elif [ -n "${TMPDIR:-}" ]; then # macOS (see `man mktemp`)
+    TMPPARENTDIR_ABS_OR_RELTOP=$(printf "%s" "$TMPDIR" | PATH=/usr/bin:/bin sed 's#/$##') # remove trailing slash on macOS
+elif [ -n "${TMP:-}" ]; then # MSYS2 (Windows), Linux
+    TMPPARENTDIR_ABS_OR_RELTOP="$TMP"
 else
-    if [ "$__USERMODE" = OFF ]; then
-        TMPPARENTDIR_ABS_OR_RELTOP="$STATEDIR/tmp"
-    elif [ -n "${_CS_DARWIN_USER_TEMP_DIR:-}" ]; then # macOS (see `man mktemp`)
-        TMPPARENTDIR_ABS_OR_RELTOP="$_CS_DARWIN_USER_TEMP_DIR"
-    elif [ -n "${TMPDIR:-}" ]; then # macOS (see `man mktemp`)
-        TMPPARENTDIR_ABS_OR_RELTOP=$(printf "%s" "$TMPDIR" | PATH=/usr/bin:/bin sed 's#/$##') # remove trailing slash on macOS
-    elif [ -n "${TMP:-}" ]; then # MSYS2 (Windows), Linux
-        TMPPARENTDIR_ABS_OR_RELTOP="$TMP"
-    else
-        TMPPARENTDIR_ABS_OR_RELTOP="/tmp"
-    fi
-    TMPPARENTDIR_BUILDHOST="${TMPPARENTDIR_BUILDHOST:-$TMPPARENTDIR_ABS_OR_RELTOP}"
+    TMPPARENTDIR_ABS_OR_RELTOP="/tmp"
 fi
+TMPPARENTDIR_BUILDHOST="${TMPPARENTDIR_BUILDHOST:-$TMPPARENTDIR_ABS_OR_RELTOP}"
 [ ! -e "$TMPPARENTDIR_BUILDHOST" ] && install -d "$TMPPARENTDIR_BUILDHOST"
 WORK=$(PATH=/usr/bin:/bin mktemp -d "$TMPPARENTDIR_BUILDHOST"/dkmlw.XXXXX)
 trap 'PATH=/usr/bin:/bin rm -rf "$WORK"' EXIT
@@ -356,7 +312,6 @@ set_opamexe() {
 # - env:USERMODE - If 'OFF' uses STATEDIR. Otherwise uses default Opam 2.2 root
 # - env:STATEDIR - If specified, uses <STATEDIR>/opam as the Opam root
 # - env:OPAMHOME - If specified, use <OPAMHOME>/bin/opam or <OPAMHOME>/bin/opam.exe
-# - env:PLATFORM - Deprecated. Only checked if DKML_FEATUREFLAG_CMAKE_PLATFORM is OFF or not defined.
 # Outputs:
 # - env:OPAMROOTDIR_BUILDHOST - The path to the Opam root directory that is usable only on the
 #     build machine (not from within a container)
@@ -364,10 +319,6 @@ set_opamexe() {
 #     argument to `exec_in_platform`
 set_opamrootdir() {
     set_opamexe
-    if [ "${DKML_FEATUREFLAG_CMAKE_PLATFORM:-OFF}" = OFF ]; then
-        printf "DKML_FEATUREFLAG_CMAKE_PLATFORM must be ON during its deprecation." >&2
-        exit 107
-    fi
     if [ "$__USERMODE" = OFF ] && [ -n "${STATEDIR:-}" ]; then
         OPAMROOTDIR_BUILDHOST="$STATEDIR/opam"
         if [ -x /usr/bin/cygpath ]; then OPAMROOTDIR_BUILDHOST=$(/usr/bin/cygpath -aw "$OPAMROOTDIR_BUILDHOST"); fi

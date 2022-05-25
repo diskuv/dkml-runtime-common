@@ -1074,7 +1074,7 @@ create_system_launcher() {
 # will be the Visual Studio installation detected by this function.
 #
 # Example:
-#   DKML_TARGET_ABI=windows_x86 DKML_FEATUREFLAG_CMAKE_PLATFORM=ON autodetect_compiler --msvs-detect /tmp/msvs-detect
+#   DKML_TARGET_ABI=windows_x86 autodetect_compiler --msvs-detect /tmp/msvs-detect
 #   eval `bash /tmp/msvs-detect` # this is what https://github.com/ocaml/opam/blob/c7759e08722520d3ab8a8e162f3841d270191490/configure#L3655 does
 #   echo $MSVS_NAME # etc.
 #
@@ -1248,14 +1248,10 @@ autodetect_compiler() {
     else
         autodetect_compiler_TEMPDIR=$(mktemp -d /tmp/dkmlc.XXXXX)
     fi
-    if [ "${DKML_FEATUREFLAG_CMAKE_PLATFORM:-OFF}" = OFF ]; then
-        autodetect_compiler_PLATFORM_ARCH=${PLATFORM:-dev}
+    if [ -n "${DKML_TARGET_ABI:-}" ]; then
+        autodetect_compiler_PLATFORM_ARCH=$DKML_TARGET_ABI
     else
-        if [ -n "${DKML_TARGET_ABI:-}" ]; then
-            autodetect_compiler_PLATFORM_ARCH=$DKML_TARGET_ABI
-        else
-            autodetect_compiler_PLATFORM_ARCH=$BUILDHOST_ARCH
-        fi
+        autodetect_compiler_PLATFORM_ARCH=$BUILDHOST_ARCH
     fi
 
     # Validate compile spec

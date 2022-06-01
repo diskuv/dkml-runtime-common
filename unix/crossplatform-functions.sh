@@ -2333,12 +2333,18 @@ validate_and_explore_ocamlhome() {
     # Set DKML_OCAMLHOME_UNIX and DKML_OCAMLHOME_ABSBINDIR_BUILDHOST
     if [ -x /usr/bin/cygpath ]; then
         DKML_OCAMLHOME_UNIX=$(/usr/bin/cygpath -au "$validate_and_explore_ocamlhome_HOME")
-        DKML_OCAMLHOME_ABSBINDIR_BUILDHOST=$(/usr/bin/cygpath -aw "$validate_and_explore_ocamlhome_HOME/$DKML_OCAMLHOME_BINDIR_UNIX")
+        DKML_OCAMLHOME_ABSBINDIR_BUILDHOST=$(/usr/bin/cygpath -aw "$DKML_OCAMLHOME_UNIX/$DKML_OCAMLHOME_BINDIR_UNIX")
+        DKML_OCAMLHOME_ABSBINDIR_MIXED=$(/usr/bin/cygpath -am "$DKML_OCAMLHOME_UNIX/$DKML_OCAMLHOME_BINDIR_UNIX")
+        DKML_OCAMLHOME_ABSBINDIR_UNIX=$(/usr/bin/cygpath -au "$DKML_OCAMLHOME_UNIX/$DKML_OCAMLHOME_BINDIR_UNIX")
     else
         # shellcheck disable=SC2034
         DKML_OCAMLHOME_UNIX="$validate_and_explore_ocamlhome_HOME"
         # shellcheck disable=SC2034
         DKML_OCAMLHOME_ABSBINDIR_BUILDHOST="$validate_and_explore_ocamlhome_HOME/$DKML_OCAMLHOME_BINDIR_UNIX"
+        # shellcheck disable=SC2034
+        DKML_OCAMLHOME_ABSBINDIR_MIXED="$validate_and_explore_ocamlhome_HOME/$DKML_OCAMLHOME_BINDIR_UNIX"
+        # shellcheck disable=SC2034
+        DKML_OCAMLHOME_ABSBINDIR_UNIX="$validate_and_explore_ocamlhome_HOME/$DKML_OCAMLHOME_BINDIR_UNIX"
     fi
 }
 

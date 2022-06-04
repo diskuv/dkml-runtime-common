@@ -296,8 +296,8 @@ set_opamexe() {
 # Outputs:
 # - env:OPAMROOTDIR_BUILDHOST - The path to the Opam root directory that is usable only on the
 #     build machine (not from within a container)
-# - env:OPAMROOTDIR_EXPAND - The path to the Opam root directory switch that works as an
-#     argument to `exec_in_platform`
+# - env:OPAMROOTDIR_EXPAND - Use this output for `opam --root OPAMROOTDIR_EXPAND`.
+#     For known versions of Opam this is equivalent to OPAMROOTDIR_BUILDHOST.
 set_opamrootdir() {
     set_opamexe
     if [ "$__USERMODE" = OFF ] && [ -n "${STATEDIR:-}" ]; then
@@ -342,18 +342,25 @@ set_opamrootdir() {
     OPAMROOTDIR_EXPAND="$OPAMROOTDIR_BUILDHOST"
 }
 
-# Select the '(diskuv-)(host|dksdk)-tools' switch.
+# [set_opamswitchdir_of_system DKMLABI]
 #
-# On Windows (anything with a DiskuvOCamlHome environment variable) the system will be a local
-# Opam switch inside DiskuvOCamlHome/dkml. Otherwise the system will be the global Opam switch
-# `dkml`.
+# Select the [dkml] switch.
+#
+# The default [dkml] switch is the 'dkml' global switch.
+#
+# In highest precedence order:
+# 1. If the environment variable DKSDK_INVOCATION is set to ON,
+#    the [dkml] switch will be the 'dksdk-<DKML_HOST_ABI>' global switch.
+# 2. If there is a Diskuv OCaml installation, as decided by autodetect_dkmlvars,
+#    then the [dkml] switch is the local <DiskuvOCamlHome>/dkml switch.
+#
+# These rules allow for the DKML OCaml system compiler to be distinct from
+# any DKSDK OCaml system compiler.
 #
 # Inputs:
-# - env:DiskuvOCamlHome - Typically you get this from `autodetect_dkmlvars || true`. It will not set
-#   the variable on non-Windows system, which is supported.
-# - env:DKSDK_INVOCATION - Optional. Defaults to OFF. If ON the name of the switch will end in dksdk-${DKML_HOST_ABI}
-#   rather than dkml. The DKSDK system switch uses a system compiler rather than a base compiler, so
-#   the switches must be segregated.
+# - env:DKSDK_INVOCATION - Optional. If ON the name of the switch will end in dksdk-${DKML_HOST_ABI}
+#   rather than dkml. The DKSDK system switch uses a system compiler (not a base compiler), so
+#   the DKML and DKSDK switches must be segregated.
 # - env:USERMODE
 # - env:STATEDIR
 # Outputs:

@@ -13,13 +13,10 @@
 # shellcheck disable=SC1091
 . "$DKMLDIR"/vendor/drc/unix/_common_tool.sh
 
-# Opam Windows has a weird bug where it rsyncs very very slowly all pinned directories (recursive
-# super slowness). There is a possibly related reference on https://github.com/ocaml/opam/wiki/2020-Developer-Meetings#opam-tools
-# By setting ON we can use GLOBAL switches for Windows, and namespace it with
-# a hash-based encoding of the TOPDIR so, for all intents and purposes, it is a local switch.
-USE_GLOBALLY_REGISTERED_LOCAL_SWITCHES_ON_WINDOWS=OFF
-
-# There is one Opam switch for each build directory.
+# [set_opamrootandswitchdir TARGETLOCAL_OPAMSWITCH TARGETGLOBAL_OPAMSWITCH]
+#
+# Either the local TARGETLOCAL_OPAMSWITCH switch or the global
+# TARGETGLOBAL_OPAMSWITCH switch must be specified (not both).
 #
 # Outputs:
 # - env:OPAMROOTDIR_BUILDHOST - [As per set_opamrootdir] The path to the Opam root directory that is usable only on the
@@ -33,38 +30,53 @@ USE_GLOBALLY_REGISTERED_LOCAL_SWITCHES_ON_WINDOWS=OFF
 #     if you want an XXX argument for `opam --switch XXX` rather than this path which is not compatible.
 # - env:OPAMSWITCHNAME_BUILDHOST - The name of the switch seen on the build host from `opam switch list --short`
 # - env:OPAMSWITCHISGLOBAL - Either ON (switch is global) or OFF (switch is external; aka local)
-# - env:OPAMSWITCHNAME_EXPAND - Either
-#     The path to the switch **not including any _opam subfolder** that works as an argument to `exec_in_platform` -OR-
-#     The name of a global switch that represents the build directory.
-#     OPAMSWITCHNAME_EXPAND works inside or outside of a container.
+# - env:OPAMSWITCHNAME_EXPAND - Use this output for `opam --switch OPAMSWITCHNAME_EXPAND`.
+#     For known versions of Opam this is equivalent to OPAMSWITCHNAME_BUILDHOST.
 set_opamrootandswitchdir() {
+    set_opamrootandswitchdir_TARGETLOCAL=$1
+    shift
+    set_opamrootandswitchdir_TARGETGLOBAL=$1
+    shift
+
+    if [ -z "$set_opamrootandswitchdir_TARGETLOCAL" ] && [ -z "$set_opamrootandswitchdir_TARGETGLOBAL" ]; then
+        echo "FATAL: Only one of TARGETLOCAL_OPAMSWITCH TARGETGLOBAL_OPAMSWITCH may be specified" >&2
+        echo "FATAL: Got: '$set_opamrootandswitchdir_TARGETLOCAL' and '$set_opamrootandswitchdir_TARGETGLOBAL'" >&2
+        exit 71
+    fi
+    if [ -n "$set_opamrootandswitchdir_TARGETLOCAL" ] && [ -n "$set_opamrootandswitchdir_TARGETGLOBAL" ]; then
+        echo "FATAL: Only one of TARGETLOCAL_OPAMSWITCH TARGETGLOBAL_OPAMSWITCH may be specified" >&2
+        echo "FATAL: Got: '$set_opamrootandswitchdir_TARGETLOCAL' and '$set_opamrootandswitchdir_TARGETGLOBAL'" >&2
+        exit 71
+    fi
+
     # Set OPAMROOTDIR_BUILDHOST and OPAMROOTDIR_EXPAND
     set_opamrootdir
 
-    if [ "$USE_GLOBALLY_REGISTERED_LOCAL_SWITCHES_ON_WINDOWS" = ON ] && is_unixy_windows_build_machine; then
-        set_opamrootandswitchdir_OPAMGLOBALNAME=$(printf "%s" "$TOPDIR" | sha256sum | cut -c1-16 | awk '{print $1}')$(printf "%s" "$TOPDIR" | tr / . |  tr -dc '[:alnum:]-_.')
-        OPAMSWITCHISGLOBAL=ON
-        OPAMSWITCHFINALDIR_BUILDHOST="$OPAMROOTDIR_BUILDHOST${OS_DIR_SEP}$set_opamrootandswitchdir_OPAMGLOBALNAME"
-        OPAMSWITCHNAME_BUILDHOST="$set_opamrootandswitchdir_OPAMGLOBALNAME"
-        OPAMSWITCHNAME_EXPAND="$set_opamrootandswitchdir_OPAMGLOBALNAME"
+    if [ -n "$set_opamrootandswitchdir_TARGETLOCAL" ]; then
+        OPAMSWITCHISGLOBAL=OFF
+
+        if [ -x /usr/bin/cygpath ]; then
+            set_opamrootandswitchdir_BUILDHOST=$(/usr/bin/cygpath -aw "$set_opamrootandswitchdir_TARGETLOCAL")
+        else
+            set_opamrootandswitchdir_BUILDHOST="$set_opamrootandswitchdir_TARGETLOCAL"
+        fi
+        OPAMSWITCHFINALDIR_BUILDHOST="$set_opamrootandswitchdir_BUILDHOST${OS_DIR_SEP}_opam"
+        OPAMSWITCHNAME_EXPAND="$set_opamrootandswitchdir_BUILDHOST"
+        OPAMSWITCHNAME_BUILDHOST="$set_opamrootandswitchdir_BUILDHOST"
     else
         # shellcheck disable=SC2034
-        OPAMSWITCHISGLOBAL=OFF
-        if cmake_flag_off "$USERMODE"; then
-            set_opamrootandswitchdir_EXPAND="$STATEDIR"
-        else
-            set_opamrootandswitchdir_EXPAND="$TARGET_OPAMSWITCH"
-        fi
+        OPAMSWITCHISGLOBAL=ON
+
+        set_opamrootandswitchdir_BUILDHOST="$OPAMROOTDIR_BUILDHOST${OS_DIR_SEP}$set_opamrootandswitchdir_TARGETGLOBAL"
         if [ -x /usr/bin/cygpath ]; then
-            set_opamrootandswitchdir_BUILDHOST=$(/usr/bin/cygpath -aw "$set_opamrootandswitchdir_EXPAND")
-        else
-            set_opamrootandswitchdir_BUILDHOST="$set_opamrootandswitchdir_EXPAND"
+            set_opamrootandswitchdir_BUILDHOST=$(/usr/bin/cygpath -aw "$set_opamrootandswitchdir_BUILDHOST")
         fi
         # shellcheck disable=SC2034
-        OPAMSWITCHFINALDIR_BUILDHOST="$set_opamrootandswitchdir_BUILDHOST${OS_DIR_SEP}_opam"
+        OPAMSWITCHFINALDIR_BUILDHOST="$set_opamrootandswitchdir_BUILDHOST"
         # shellcheck disable=SC2034
-        OPAMSWITCHNAME_EXPAND="$set_opamrootandswitchdir_BUILDHOST"
+        OPAMSWITCHNAME_EXPAND="$set_opamrootandswitchdir_TARGETGLOBAL"
         # shellcheck disable=SC2034
-        OPAMSWITCHNAME_BUILDHOST="$set_opamrootandswitchdir_BUILDHOST"
+        OPAMSWITCHNAME_BUILDHOST="$set_opamrootandswitchdir_TARGETGLOBAL"
     fi
+
 }

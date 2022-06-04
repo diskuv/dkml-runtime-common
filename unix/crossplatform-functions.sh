@@ -1095,9 +1095,6 @@ create_system_launcher() {
 #   cross-compiling to Win32 binary) and often runs faster (ex. QEMU emulation of a native compiler is slow). The tradeoff is similar to
 #   precision (correctness for native compiler) versus recall (binaries can be produced in more situations, more quickly, than a native compiler).
 #   The default is to prefer native compiler (ie. OFF) so that the generated binaries are always correct.
-# - env:PLATFORM - (Deprecated) Optional; if missing treated as 'dev'. This variable will select the Visual Studio
-#   options necessary to cross-compile (or native compile) to the target PLATFORM. 'dev' is always
-#   a native compilation.
 # - env:WORK - Optional. If provided will be used as temporary directory
 # - env:DKML_COMPILE_SPEC - Optional. If specified will be a specification number, which determines which
 #   other environment variables have to be supplied and the format of each variable.
@@ -1137,6 +1134,7 @@ create_system_launcher() {
 #     - env:DKML_COMPILE_CM_CMAKE_ASM_FLAGS_RELEASE
 #     - env:DKML_COMPILE_CM_CMAKE_ASM_FLAGS_RELEASECOMPATFUZZ
 #     - env:DKML_COMPILE_CM_CMAKE_ASM_FLAGS_RELEASECOMPATPERF
+#     - env:DKML_COMPILE_CM_CMAKE_ASM_OSX_DEPLOYMENT_TARGET_FLAG
 #     - env:DKML_COMPILE_CM_CMAKE_C_COMPILER
 #     - env:DKML_COMPILE_CM_CMAKE_C_COMPILER_ID
 #     - env:DKML_COMPILE_CM_CMAKE_C_COMPILE_OPTIONS_PIC
@@ -1151,6 +1149,7 @@ create_system_launcher() {
 #     - env:DKML_COMPILE_CM_CMAKE_C_FLAGS_RELEASE
 #     - env:DKML_COMPILE_CM_CMAKE_C_FLAGS_RELEASECOMPATFUZZ
 #     - env:DKML_COMPILE_CM_CMAKE_C_FLAGS_RELEASECOMPATPERF
+#     - env:DKML_COMPILE_CM_CMAKE_C_OSX_DEPLOYMENT_TARGET_FLAG
 #     - env:DKML_COMPILE_CM_CMAKE_C_STANDARD_INCLUDE_DIRECTORIES
 #     - env:DKML_COMPILE_CM_CMAKE_C_STANDARD_LIBRARIES
 #     - env:DKML_COMPILE_CM_CMAKE_CXX_COMPILER
@@ -1167,8 +1166,10 @@ create_system_launcher() {
 #     - env:DKML_COMPILE_CM_CMAKE_CXX_FLAGS_RELEASE
 #     - env:DKML_COMPILE_CM_CMAKE_CXX_FLAGS_RELEASECOMPATFUZZ
 #     - env:DKML_COMPILE_CM_CMAKE_CXX_FLAGS_RELEASECOMPATPERF
+#     - env:DKML_COMPILE_CM_CMAKE_CXX_OSX_DEPLOYMENT_TARGET_FLAG
 #     - env:DKML_COMPILE_CM_CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES
 #     - env:DKML_COMPILE_CM_CMAKE_CXX_STANDARD_LIBRARIES
+#     - env:DKML_COMPILE_CM_CMAKE_OSX_DEPLOYMENT_TARGET
 #     - env:DKML_COMPILE_CM_CMAKE_SIZEOF_VOID_P
 #     - env:DKML_COMPILE_CM_CMAKE_LINKER
 #     - env:DKML_COMPILE_CM_CMAKE_SHARED_LINKER_FLAGS
@@ -1181,6 +1182,11 @@ create_system_launcher() {
 #     - env:DKML_COMPILE_CM_CMAKE_STRIP
 #     - env:DKML_COMPILE_CM_CMAKE_LIBRARY_ARCHITECTURE
 #     - env:DKML_COMPILE_CM_MSVC - The CMake variable MSVC
+#   - If no DKML_COMPILE_SPEC or no DKML_COMPILE_TYPE above ...
+#     | Machine = Darwin |
+#     - env:DKML_COMPILE_DARWIN_OSX_DEPLOYMENT_TARGET - The minimum version of the target
+#       platform (e.g. macOS or iOS) on which the target binaries are to be deployed.
+#       Populates -mmacosx-version-min=MM.NN in clang.
 # Outputs:
 # - env:DKMLPARENTHOME_BUILDHOST
 # - env:BUILDHOST_ARCH will contain the correct ARCH
@@ -1235,7 +1241,6 @@ autodetect_compiler() {
     fi
     autodetect_compiler_OUTPUTFILE="$1"
     shift
-    autodetect_compiler_TEMPDIR=${WORK:-$TMP}
     if [ -n "${WORK:-}" ]; then
         autodetect_compiler_TEMPDIR=$WORK
     elif [ -n "${_CS_DARWIN_USER_TEMP_DIR:-}" ]; then # macOS (see `man mktemp`)
@@ -1426,6 +1431,7 @@ autodetect_compiler_cmake() {
         # Platform-specific requirements
         # ----
 
+        autodetect_compiler_cmake_Specific_ASFLAGS=
         autodetect_compiler_cmake_Specific_CFLAGS=
         autodetect_compiler_cmake_Specific_CXXFLAGS=
         autodetect_compiler_cmake_Specific_LDFLAGS=
@@ -1466,9 +1472,23 @@ autodetect_compiler_cmake() {
             autodetect_compiler_cmake_Specific_CFLAGS="$autodetect_compiler_cmake_Specific_CFLAGS -mstackrealign"
             autodetect_compiler_cmake_Specific_CXXFLAGS="$autodetect_compiler_cmake_Specific_CXXFLAGS -mstackrealign"
           fi
-
         fi
 
+        # == Darwin ==
+
+        if [ "$DKML_COMPILE_CM_CMAKE_SYSTEM_NAME" = "Darwin" ]; then
+            if [ -n "${DKML_COMPILE_CM_CMAKE_OSX_DEPLOYMENT_TARGET:-}" ]; then
+                if [ -n "${DKML_COMPILE_CM_CMAKE_ASM_OSX_DEPLOYMENT_TARGET_FLAG:-}" ]; then
+                    autodetect_compiler_cmake_Specific_ASFLAGS="$autodetect_compiler_cmake_Specific_ASFLAGS $DKML_COMPILE_CM_CMAKE_ASM_OSX_DEPLOYMENT_TARGET_FLAG$DKML_COMPILE_CM_CMAKE_OSX_DEPLOYMENT_TARGET"
+                fi
+                if [ -n "${DKML_COMPILE_CM_CMAKE_C_OSX_DEPLOYMENT_TARGET_FLAG:-}" ]; then
+                    autodetect_compiler_cmake_Specific_CFLAGS="$autodetect_compiler_cmake_Specific_CFLAGS $DKML_COMPILE_CM_CMAKE_C_OSX_DEPLOYMENT_TARGET_FLAG$DKML_COMPILE_CM_CMAKE_OSX_DEPLOYMENT_TARGET"
+                fi
+                if [ -n "${DKML_COMPILE_CM_CMAKE_CXX_OSX_DEPLOYMENT_TARGET_FLAG:-}" ]; then
+                    autodetect_compiler_cmake_Specific_CXXFLAGS="$autodetect_compiler_cmake_Specific_CXXFLAGS $DKML_COMPILE_CM_CMAKE_CXX_OSX_DEPLOYMENT_TARGET_FLAG$DKML_COMPILE_CM_CMAKE_OSX_DEPLOYMENT_TARGET"
+                fi
+            fi
+        fi
 
         # Set _CMAKE_C_FLAGS_FOR_CONFIG and _CMAKE_ASM_FLAGS_FOR_CONFIG to
         # $DKML_COMPILE_CM_CMAKE_C_FLAGS_DEBUG if DKML_COMPILE_CM_CONFIG=Debug, etc.
@@ -1489,7 +1509,7 @@ autodetect_compiler_cmake() {
             printf "  (\"CXXFLAGS\" \"%s\")\n" "$autodetect_compiler_cmake_CXXFLAGS"
             autodetect_compiler_cmake_AS=$(escape_arg_as_ocaml_string "$autodetect_compiler_cmake_THE_AS")
             printf "  (\"AS\" \"%s\")\n" "$autodetect_compiler_cmake_AS"
-            autodetect_compiler_cmake_ASFLAGS=$(escape_arg_as_ocaml_string "${DKML_COMPILE_CM_CMAKE_ASM_FLAGS:-} $_CMAKE_ASM_FLAGS_FOR_CONFIG")
+            autodetect_compiler_cmake_ASFLAGS=$(escape_arg_as_ocaml_string "$autodetect_compiler_cmake_Specific_ASFLAGS ${DKML_COMPILE_CM_CMAKE_ASM_FLAGS:-} $_CMAKE_ASM_FLAGS_FOR_CONFIG")
             printf "  (\"ASFLAGS\" \"%s\")\n" "$autodetect_compiler_cmake_ASFLAGS"
             printf "  (\"LDFLAGS\" \"%s\")\n" "$autodetect_compiler_cmake_Specific_LDFLAGS"
             printf "  (\"LDLIBS\" \"%s\")\n" "${DKML_COMPILE_CM_CMAKE_C_STANDARD_LIBRARIES:-}"
@@ -1520,7 +1540,7 @@ autodetect_compiler_cmake() {
             printf "  CXXFLAGS=%s %s\n" "$autodetect_compiler_cmake_CXXFLAGS" "\\"
             autodetect_compiler_cmake_AS=$(escape_args_for_shell "$autodetect_compiler_cmake_THE_AS")
             printf "  AS=%s %s\n" "$autodetect_compiler_cmake_AS" "\\"
-            autodetect_compiler_cmake_ASFLAGS=$(escape_args_for_shell "${DKML_COMPILE_CM_CMAKE_ASM_FLAGS:-} $_CMAKE_ASM_FLAGS_FOR_CONFIG")
+            autodetect_compiler_cmake_ASFLAGS=$(escape_args_for_shell "$autodetect_compiler_cmake_Specific_ASFLAGS ${DKML_COMPILE_CM_CMAKE_ASM_FLAGS:-} $_CMAKE_ASM_FLAGS_FOR_CONFIG")
             printf "  ASFLAGS=%s %s\n" "$autodetect_compiler_cmake_ASFLAGS" "\\"
             autodetect_compiler_cmake_LDFLAGS=$(escape_args_for_shell "$autodetect_compiler_cmake_Specific_LDFLAGS")
             printf "  LDFLAGS=%s %s\n" "$autodetect_compiler_cmake_LDFLAGS" "\\"
@@ -1637,7 +1657,14 @@ autodetect_compiler_system() {
     "$DKMLSYS_MV" "$autodetect_compiler_OUTPUTFILE".tmp "$autodetect_compiler_OUTPUTFILE"
 }
 
+# Inputs:
+# - env:DKML_COMPILE_DARWIN_OSX_DEPLOYMENT_TARGET - Similar to CMAKE_OSX_DEPLOYMENT_TARGET
 autodetect_compiler_darwin() {
+    autodetect_compiler_darwin_CLANG_OSXVER_OPT="${DKML_COMPILE_DARWIN_OSX_DEPLOYMENT_TARGET:-}"
+    if [ -n "$autodetect_compiler_darwin_CLANG_OSXVER_OPT" ]; then
+        autodetect_compiler_darwin_CLANG_OSXVER_OPT=" -mmacosx-version-min=${autodetect_compiler_darwin_CLANG_OSXVER_OPT}"
+    fi
+
     {
         if [ "$autodetect_compiler_OUTPUTMODE" = SEXP ]; then
             printf "(\n"
@@ -1649,17 +1676,17 @@ autodetect_compiler_darwin() {
             if [ "$autodetect_compiler_PLATFORM_ARCH" = "darwin_x86_64" ] ; then
                 printf "exec %s AS='%s' ASFLAGS='%s' CC='%s' CFLAGS='%s' LD='%s' LDFLAGS='%s' " "$DKMLSYS_ENV" \
                     "clang" \
-                    "-arch x86_64 -c" \
+                    "-arch x86_64 -c$autodetect_compiler_darwin_CLANG_OSXVER_OPT" \
                     "clang" \
-                    "-arch x86_64" \
+                    "-arch x86_64$autodetect_compiler_darwin_CLANG_OSXVER_OPT" \
                     "ld" \
                     "-arch x86_64"
             elif [ "$autodetect_compiler_PLATFORM_ARCH" = "darwin_arm64" ]; then
                 printf "exec %s AS='%s' ASFLAGS='%s' CC='%s' CFLAGS='%s' LD='%s' LDFLAGS='%s' " "$DKMLSYS_ENV" \
                     "clang" \
-                    "-arch arm64 -c" \
+                    "-arch arm64 -c$autodetect_compiler_darwin_CLANG_OSXVER_OPT" \
                     "clang" \
-                    "-arch arm64" \
+                    "-arch arm64$autodetect_compiler_darwin_CLANG_OSXVER_OPT" \
                     "ld" \
                     "-arch arm64"
             else

@@ -2435,4 +2435,5 @@ create_workdir() {
     TMPPARENTDIR_BUILDHOST="${TMPPARENTDIR_BUILDHOST:-$make_workdir_DEFAULT}"
     [ ! -e "$TMPPARENTDIR_BUILDHOST" ] && install -d "$TMPPARENTDIR_BUILDHOST"
     WORK=$(PATH=/usr/bin:/bin mktemp -d "$TMPPARENTDIR_BUILDHOST"/dkmlw.XXXXX)
+    install -d "$WORK"
 }

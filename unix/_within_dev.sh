@@ -83,13 +83,8 @@ fi
 DKMLDIR=$(dirname "$0")
 DKMLDIR=$(cd "$DKMLDIR"/../../.. && pwd)
 
-if [ -n "${STATEDIR:-}" ]; then
-    # shellcheck disable=SC1091
-    . "$DKMLDIR"/vendor/drc/unix/_common_build.sh
-else
-    # shellcheck disable=SC1091
-    . "$DKMLDIR"/vendor/drc/unix/_common_tool.sh
-fi
+# shellcheck disable=SC1091
+. "$DKMLDIR"/vendor/drc/unix/_common_tool.sh
 
 # Essential environment values.
 LAUNCHER_ARGS=()

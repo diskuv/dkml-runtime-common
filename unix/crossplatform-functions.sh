@@ -2415,7 +2415,7 @@ spawn_rsync() {
 # Make a work directory. It is your responsibility to setup a trap as in:
 #   trap 'PATH=/usr/bin:/bin rm -rf "$WORK"' EXIT
 # Inputs:
-#   env:TMPPARENTDIR_BUILDHOST : Optional. If set then it will be used as the
+#   env:DKML_TMP_PARENTDIR : Optional. If set then it will be used as the
 #   parent directory of the work directory.
 # Outputs:
 #   env:WORK : The work directory
@@ -2432,8 +2432,8 @@ create_workdir() {
     else
         make_workdir_DEFAULT="/tmp"
     fi
-    TMPPARENTDIR_BUILDHOST="${TMPPARENTDIR_BUILDHOST:-$make_workdir_DEFAULT}"
-    [ ! -e "$TMPPARENTDIR_BUILDHOST" ] && install -d "$TMPPARENTDIR_BUILDHOST"
-    WORK=$(PATH=/usr/bin:/bin mktemp -d "$TMPPARENTDIR_BUILDHOST"/dkmlw.XXXXX)
+    DKML_TMP_PARENTDIR="${DKML_TMP_PARENTDIR:-$make_workdir_DEFAULT}"
+    [ ! -e "$DKML_TMP_PARENTDIR" ] && install -d "$DKML_TMP_PARENTDIR"
+    WORK=$(PATH=/usr/bin:/bin mktemp -d "$DKML_TMP_PARENTDIR"/dkmlw.XXXXX)
     install -d "$WORK"
 }

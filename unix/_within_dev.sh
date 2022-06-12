@@ -9,10 +9,8 @@ set -euf
 
 usage() {
     printf "%s\n" "Usage:" >&2
-    printf "%s\n" "    within-dev.sh -h                          Display this help message." >&2
-    printf "%s\n" "    within-dev.sh -d STATEDIR [-u OFF] command ...  Run the command and any arguments in the environment of STATEDIR." >&2
-    printf "%s\n" "       -u ON|OFF: User mode. Currently unused except to influence the temporary directory, but passthrough the user mode of the calling script" >&2
-    printf "%s\n" "       -d STATEDIR: State directory. Currently unused except to influence the temporary directory, but passthrough the user mode of the calling script" >&2
+    printf "%s\n" "    within-dev.sh -h           Display this help message." >&2
+    printf "%s\n" "    within-dev.sh command ...  Run the command and any arguments." >&2
     printf "%s\n" "Advanced Options:" >&2
     printf "%s\n" "   -p DKMLABI: Optional. The DKML ABI. Defaults to an auto-detected host ABI" >&2
     printf "%s\n" "   -c: If specified, compilation flags like CC are added to the environment." >&2
@@ -32,9 +30,7 @@ DKMLABI=
 PREHOOK_SINGLE=
 PREHOOK_DOUBLE=
 COMPILATION=OFF
-STATEDIR=
-USERMODE=ON
-while getopts ":hp:0:1:cu:d:" opt; do
+while getopts ":hp:0:1:c" opt; do
     case ${opt} in
         h )
             usage
@@ -55,13 +51,6 @@ while getopts ":hp:0:1:cu:d:" opt; do
         ;;
         c )
             COMPILATION=ON
-        ;;
-        d )
-            STATEDIR=$OPTARG
-        ;;
-        u )
-            # shellcheck disable=SC2034
-            USERMODE=$OPTARG
         ;;
         \? )
             printf "%s\n" "This is not an option: -$OPTARG" >&2
@@ -107,21 +96,6 @@ autodetect_system_binaries
 # and escapes).
 autodetect_system_path # Autodetect DKML_SYSTEM_PATH
 PATH="$DKML_SYSTEM_PATH"
-
-# # Autodetect DKMLVARS and add to PATH
-# autodetect_dkmlvars || true
-# if [ -n "${DKMLBINPATHS_UNIX:-}" ]; then
-#     ENV_PATH_PREFIX="$DKMLBINPATHS_UNIX"
-# else
-#     ENV_PATH_PREFIX=
-# fi
-
-# # Add prefix if specified
-# if [ -n "$ENV_PATH_PREFIX" ]; then
-#     ENV_PATH_PREFIX=$(printf "%s" "$ENV_PATH_PREFIX" | $DKMLSYS_SED 's#/:#:#g; s#/$##') # remove trailing slashes
-#     PATH="$ENV_PATH_PREFIX:$PATH"
-# fi
-# printf "%s\n" "PATH ={within-dev.sh#2} $PATH" >&2
 
 # Make a script to run any prehooks
 {

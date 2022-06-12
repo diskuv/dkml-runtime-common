@@ -92,9 +92,6 @@ else
     OS_DIR_SEP=/
 fi
 
-# shellcheck disable=SC2153
-__USERMODE="$USERMODE" # fails if USERMODE not set
-
 # Set OPAM_CACHE_SUBDIR and cache keys like WRAP_COMMANDS_KEY
 # shellcheck disable=SC2034
 OPAM_CACHE_SUBDIR=.dkml/opam-cache
@@ -104,13 +101,7 @@ WRAP_COMMANDS_CACHE_KEY=wrap-commands."$dkml_root_version"
 # shellcheck disable=SC1091
 . "$DKMLDIR/vendor/drc/unix/crossplatform-functions.sh"
 
-# Temporary directory that needs to be accessible inside and outside of containers so shell scripts
-# can be sent from the outside of a container into a container.
-# So we make $WORK be a subdirectory of $STATEDIR.
-if [ "$__USERMODE" = OFF ]; then
-    # shellcheck disable=SC2034
-    TMPPARENTDIR_BUILDHOST="$STATEDIR/tmp"
-fi
+# Work directory $WORK
 create_workdir
 trap 'PATH=/usr/bin:/bin rm -rf "$WORK"' EXIT
 
@@ -209,7 +200,7 @@ exec_in_platform() {
     if [ -n "${PLATFORM_EXEC_PRE_DOUBLE:-}" ]; then
         ACTUAL_PRE_HOOK_DOUBLE="$PLATFORM_EXEC_PRE_DOUBLE"
     fi
-    printf "%s\n" "exec '$DKMLDIR'/vendor/drc/unix/_within_dev.sh -p '$_exec_dev_or_arch_helper_DKMLPLATFORM' -d '$STATEDIR' -u '$USERMODE' -0 '${ACTUAL_PRE_HOOK_SINGLE:-}' -1 '${ACTUAL_PRE_HOOK_DOUBLE:-}' \\" > "$_exec_dev_or_arch_helper_CMDFILE"
+    printf "%s\n" "exec '$DKMLDIR'/vendor/drc/unix/_within_dev.sh -p '$_exec_dev_or_arch_helper_DKMLPLATFORM' -0 '${ACTUAL_PRE_HOOK_SINGLE:-}' -1 '${ACTUAL_PRE_HOOK_DOUBLE:-}' \\" > "$_exec_dev_or_arch_helper_CMDFILE"
 
     cat "$_exec_dev_or_arch_helper_CMDARGS" >> "$_exec_dev_or_arch_helper_CMDFILE"
 
@@ -290,7 +281,6 @@ set_opamexe() {
 # A side-effect of this call is that `opam init` may be called.
 #
 # Inputs:
-# - env:USERMODE - If 'OFF' uses STATEDIR. Otherwise uses default Opam 2.2 root
 # - env:STATEDIR - If specified, uses <STATEDIR>/opam as the Opam root
 # - env:OPAMHOME - If specified, use <OPAMHOME>/bin/opam or <OPAMHOME>/bin/opam.exe
 # Outputs:
@@ -300,7 +290,7 @@ set_opamexe() {
 #     For known versions of Opam this is equivalent to OPAMROOTDIR_BUILDHOST.
 set_opamrootdir() {
     set_opamexe
-    if [ "$__USERMODE" = OFF ] && [ -n "${STATEDIR:-}" ]; then
+    if [ -n "${STATEDIR:-}" ]; then
         OPAMROOTDIR_BUILDHOST="$STATEDIR/opam"
         if [ -x /usr/bin/cygpath ]; then OPAMROOTDIR_BUILDHOST=$(/usr/bin/cygpath -aw "$OPAMROOTDIR_BUILDHOST"); fi
     elif is_unixy_windows_build_machine; then
@@ -361,7 +351,6 @@ set_opamrootdir() {
 # - env:DKSDK_INVOCATION - Optional. If ON the name of the switch will end in dksdk-${DKML_HOST_ABI}
 #   rather than dkml. The DKSDK system switch uses a system compiler (not a base compiler), so
 #   the DKML and DKSDK switches must be segregated.
-# - env:USERMODE
 # - env:STATEDIR
 # Outputs:
 # - env:OPAMSWITCHFINALDIR_BUILDHOST - Either:
@@ -387,7 +376,7 @@ set_opamswitchdir_of_system() {
     # changing diskuv-sdk > 140-opam-switch-dkml > CMakeLists.txt.
 
     # Name the switch. Since there may be a zillion switches in the user's default
-    # OPAMROOT (ie. USERMODE=ON), we have an unambiguous switch name that identifies
+    # OPAMROOT (ie. no state dir), we have an unambiguous switch name that identifies
     # that the switch is for Diskuv (either through "dksdk-*" or "diskuv-*" or
     # a local switch that is part of DiskuvOCamlHome).
     if [ "${DKSDK_INVOCATION:-OFF}" = ON ]; then
@@ -403,18 +392,16 @@ set_opamswitchdir_of_system() {
     # Set DKMLHOME_UNIX if available
     autodetect_dkmlvars || true
     # Set OPAMSWITCHFINALDIR_BUILDHOST and OPAMSWITCHNAME_EXPAND
-    if cmake_flag_off "$USERMODE"; then
+    if [ -n "${STATEDIR:-}" ]; then
         OPAMSWITCHNAME_EXPAND="${set_opamswitchdir_of_system_SWITCHBASE}"
         OPAMSWITCHFINALDIR_BUILDHOST="$OPAMROOTDIR_BUILDHOST${OS_DIR_SEP}${set_opamswitchdir_of_system_SWITCHBASE}"
+    elif [ -n "${DKMLHOME_BUILDHOST:-}" ]; then
+        OPAMSWITCHNAME_EXPAND="$DKMLHOME_BUILDHOST${OS_DIR_SEP}${set_opamswitchdir_of_system_SWITCHBASE}"
+        OPAMSWITCHFINALDIR_BUILDHOST="$OPAMSWITCHNAME_EXPAND${OS_DIR_SEP}_opam"
     else
-        if [ -n "${DKMLHOME_BUILDHOST:-}" ]; then
-            OPAMSWITCHNAME_EXPAND="$DKMLHOME_BUILDHOST${OS_DIR_SEP}${set_opamswitchdir_of_system_SWITCHBASE}"
-            OPAMSWITCHFINALDIR_BUILDHOST="$OPAMSWITCHNAME_EXPAND${OS_DIR_SEP}_opam"
-        else
-            OPAMSWITCHNAME_EXPAND="${set_opamswitchdir_of_system_SWITCHBASE_UNAMBIGUOUS}"
-            # shellcheck disable=SC2034
-            OPAMSWITCHFINALDIR_BUILDHOST="$OPAMROOTDIR_BUILDHOST${OS_DIR_SEP}${set_opamswitchdir_of_system_SWITCHBASE_UNAMBIGUOUS}"
-        fi
+        OPAMSWITCHNAME_EXPAND="${set_opamswitchdir_of_system_SWITCHBASE_UNAMBIGUOUS}"
+        # shellcheck disable=SC2034
+        OPAMSWITCHFINALDIR_BUILDHOST="$OPAMROOTDIR_BUILDHOST${OS_DIR_SEP}${set_opamswitchdir_of_system_SWITCHBASE_UNAMBIGUOUS}"
     fi
     # Set WITHDKMLEXE_BUILDHOST
     #   shellcheck disable=SC2034

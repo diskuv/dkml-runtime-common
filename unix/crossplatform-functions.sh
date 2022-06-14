@@ -1727,11 +1727,14 @@ autodetect_compiler_vsdev() {
     if [ -x /usr/bin/cygpath ]; then
         autodetect_compiler_VSDEVCMDFILE_WIN=$(/usr/bin/cygpath -aw "$autodetect_compiler_VSDEVCMD")
         autodetect_compiler_TEMPDIR_WIN=$(/usr/bin/cygpath -aw "$autodetect_compiler_TEMPDIR")
+        autodetect_compiler_TEMPDIR_DOS=$(/usr/bin/cygpath -ad "$autodetect_compiler_TEMPDIR")
     else
         autodetect_compiler_VSDEVCMDFILE_WIN="$autodetect_compiler_VSDEVCMD"
         autodetect_compiler_TEMPDIR_WIN="$autodetect_compiler_TEMPDIR"
+        autodetect_compiler_TEMPDIR_DOS="$autodetect_compiler_TEMPDIR"
     fi
     {
+        printf "set TEMP=%s\n" "$autodetect_compiler_TEMPDIR_DOS"
         printf "@call %s%s%s %s\n" '"' "$autodetect_compiler_VSDEVCMDFILE_WIN" '"' '%*'
         printf "%s\n" 'if %ERRORLEVEL% neq 0 ('
         printf "%s\n" 'echo.'
@@ -1743,6 +1746,10 @@ autodetect_compiler_vsdev() {
     } > "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat
     #   +x for Cygwin (not needed for MSYS2)
     chmod +x "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat
+    if [ "${DKML_BUILD_TRACE:-OFF}" = ON ] && [ "${DKML_BUILD_TRACE_LEVEL:-0}" -ge 2 ]; then
+        printf "@+: %s/vsdevcmd-and-printenv.bat\n" "$autodetect_compiler_TEMPDIR" >&2
+        "$DKMLSYS_SED" 's/^/@+| /' "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat | "$DKMLSYS_AWK" '{print}' >&2
+    fi
 
     # SECOND, construct a function that will call Microsoft's vsdevcmd.bat script.
     # We will use DKML_SYSTEM_PATH for reproducibility.

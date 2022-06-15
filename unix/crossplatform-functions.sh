@@ -1734,7 +1734,7 @@ autodetect_compiler_vsdev() {
         autodetect_compiler_TEMPDIR_DOS="$autodetect_compiler_TEMPDIR"
     fi
     {
-        printf "set TEMP=%s\n" "$autodetect_compiler_TEMPDIR_DOS"
+        printf "@set TEMP=%s\n" "$autodetect_compiler_TEMPDIR_DOS"
         printf "@call %s%s%s %s\n" '"' "$autodetect_compiler_VSDEVCMDFILE_WIN" '"' '%*'
         printf "%s\n" 'if %ERRORLEVEL% neq 0 ('
         printf "%s\n" 'echo.'

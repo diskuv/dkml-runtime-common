@@ -2444,3 +2444,32 @@ create_workdir() {
     WORK=$(PATH=/usr/bin:/bin mktemp -d "$DKML_TMP_PARENTDIR"/dkmlw.XXXXX)
     install -d "$WORK"
 }
+
+# When executing an `ocamlc -pp` preprocessor command like
+# https://github.com/ocaml/ocaml/blob/77b164c65e7bc8625d0bd79542781952afdd2373/stdlib/Compflags#L18-L20
+# (invoked by https://github.com/ocaml/ocaml/blob/77b164c65e7bc8625d0bd79542781952afdd2373/stdlib/Makefile#L201),
+# `ocamlc` will use a temporary directory TMPDIR to hold
+# the preprocessor output. However for MSYS2 you can get
+# a TMPDIR with a space that OCaml 4.12.1 will choke on:
+# * `C:\Users\person 1\AppData\Local\Programs\DiskuvOCaml\tools\MSYS2\tmp\ocamlpp87171a`
+# * https://gitlab.com/diskuv/diskuv-ocaml/-/issues/13#note_987989664
+#
+# Root cause:
+# https://github.com/ocaml/ocaml/blob/cce52acc7c7903e92078e9fe40745e11a1b944f0/driver/pparse.ml#L27-L29
+#
+# Mitigation:
+# > Filename.get_temp_dir_name (https://v2.ocaml.org/api/Filename.html#VALget_temp_dir_name) uses
+# > TMPDIR on Unix and TEMP on Windows
+# * Make OCaml's temporary directory be the WORK directory
+# * Set it to a DOS 8.3 short path like
+#  `C:\Users\PERSON~1\AppData\Local\Programs\DISKUV~1\...\tmp` on Windows.
+export_safe_tmpdir() {
+  TMPDIR=$WORK
+  TEMP=$WORK
+  if [ -x /usr/bin/cygpath ]; then
+      TMPDIR=$(cygpath -ad "$TMPDIR")
+      TEMP=$(cygpath -ad "$TEMP")
+  fi
+  export TMPDIR
+  export TEMP
+}

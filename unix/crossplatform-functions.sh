@@ -2153,6 +2153,15 @@ log_trace() {
 sha256compute() {
     sha256compute_FILE="$1"
     shift
+    # For reasons unclear doing the following in MSYS2:
+    #   sha256sum 'Z:\source\README.md'
+    # will produce a backslash like:
+    #   \5518c76ed7234a153941fb7bc94b6e91d9cb8f1c4e22daf169a59b5878c3fc8a *Z:\\source\\README.md
+    # So always cygpath the filename if available
+    if [ -x /usr/bin/cygpath ]; then
+        sha256compute_FILE=$(/usr/bin/cygpath -a "$sha256compute_FILE")
+    fi
+
     if [ -x /usr/bin/shasum ]; then
         /usr/bin/shasum -a 256 "$sha256compute_FILE" | awk '{print $1}'
     elif [ -x /usr/bin/sha256sum ]; then
@@ -2178,6 +2187,20 @@ sha256check() {
         printf "FATAL: %s\n" "No sha256 checksum utility found" >&2
         exit 107
     fi
+}
+
+# Make a checksum suitable as a cache key, where the cache key will be part of
+# a filename stored on disk. We don't want it too big or it will blow away
+# Windows 260 char maxpath limit.
+#
+# Set to 10 characters ... currently only hex characters ... so a cache
+# collision every 4^10 = 2^20 values (~1 million). If you need better or a
+# cache key that will not change when DKML is upgraded, use sha256compute()
+# instead.
+cachekey_for_filename() {
+    cachekey_for_filename_FILE=$1
+    shift
+    sha256compute "$cachekey_for_filename_FILE" | cut -c 1-10
 }
 
 # [downloadfile URL FILE SUM] downloads from URL into FILE and verifies the SHA256 checksum of SUM.

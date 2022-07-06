@@ -691,16 +691,20 @@ install_reproducible_system_packages() {
     install_reproducible_system_packages_BOOTSTRAPDIR=$DEPLOYDIR_UNIX/$install_reproducible_system_packages_BOOTSTRAPRELDIR
     "$DKMLSYS_INSTALL" -d "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTDIR"/
 
-    if is_msys2_msys_build_machine; then
-        if [ -x /git-bash.exe ]; then
-            # Git Bash
-            true > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
-            printf "#!/bin/sh\necho Install Git for Windows from https://git-scm.com/download/win which gives you Git Bash. Git Bash should be used to run the remaining scripts\n" > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"
+    if is_msys2_msys_build_machine && [ -x /git-bash.exe ]; then
+        # Git Bash
+        true > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
+        printf "#!/bin/sh\necho Install Git for Windows from https://git-scm.com/download/win which gives you Git Bash. Git Bash should be used to run the remaining scripts\n" > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"
+    elif [ -x /usr/bin/pacman ] || [ -x /usr/sbin/pacman ]; then
+        # Works on MSYS2 (bin) and ArchLinux (sbin)
+        # https://wiki.archlinux.org/title/Pacman/Tips_and_tricks#List_of_installed_packages
+        if [ -x /usr/bin/pacman ]; then
+            pacmanexe=/usr/bin/pacman
         else
-            # https://wiki.archlinux.org/title/Pacman/Tips_and_tricks#List_of_installed_packages
-            pacman -Qqet > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
-            printf "#!/bin/sh\nexec pacman -S \"\$@\" --needed - < '%s'\n" "$install_reproducible_system_packages_BOOTSTRAPRELDIR/$install_reproducible_system_packages_PACKAGEFILE" > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"
+            pacmanexe=/usr/sbin/pacman
         fi
+        "$pacmanexe" -Qqet > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
+        printf "#!/bin/sh\nexec %s -S \"\$@\" --needed - < '%s'\n" "$pacmanexe" "$install_reproducible_system_packages_BOOTSTRAPRELDIR/$install_reproducible_system_packages_PACKAGEFILE" > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"
     elif is_cygwin_build_machine; then
         cygcheck.exe -c -d > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
         {

@@ -751,15 +751,50 @@ install_reproducible_system_packages() {
             printf "sudo dpkg --set-selections < '%s'\n" "$install_reproducible_system_packages_BOOTSTRAPRELDIR/$install_reproducible_system_packages_PACKAGEFILE"
             printf 'sudo apt-get dselect-upgrade\n'
         } > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"
+    elif [ -x /usr/bin/rpm ] && [ -x /usr/bin/zypper ]; then
+        # OpenSUSE packages
+        /usr/bin/rpm -qa > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
+        {
+            printf "#!/bin/sh\n"
+            printf "sudo /usr/bin/zypper install "
+            awk 'NF==1 {printf "%s ", $1}' "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
+            printf '\n'
+        } > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"
+        # truncate package list, since already embedded in script
+        true > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
+    elif [ -x /usr/bin/rpm ] && [ -x /usr/bin/dnf ]; then
+        # newer Oracle Linux / Fedora packages
+        /usr/bin/rpm -qa > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
+        {
+            printf "#!/bin/sh\n"
+            printf "sudo /usr/bin/dnf install "
+            awk 'NF==1 {printf "%s ", $1}' "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
+            printf ' -y\n'
+        } > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"
+        # truncate package list, since already embedded in script
+        true > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
+    elif [ -x /usr/bin/rpm ] && [ -x /usr/bin/yum ]; then
+        # older Fedora packages
+        /usr/bin/rpm -qa > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
+        {
+            printf "#!/bin/sh\n"
+            printf "sudo /usr/bin/yum -y install "
+            awk 'NF==1 {printf "%s ", $1}' "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
+            printf '\n'
+        } > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"
+        # truncate package list, since already embedded in script
+        true > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
     elif [ -x /sbin/apk ]; then
         # Alpine packages
         /sbin/apk info > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
         {
             printf "#!/bin/sh\n"
             printf "sudo /sbin/apk add "
-            awk '{printf "%s " $1}' "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
+            awk 'NF==1 {printf "%s ", $1}' "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
             printf '\n'
         } > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"
+        # truncate package list, since already embedded in script
+        true > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
     elif [ -n "${DEFAULT_DOCKCROSS_IMAGE:-}" ] || [ -e /dockcross ]; then
         true > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
         printf "#!/bin/sh\necho Run from inside the %s Docker container\n" "${DEFAULT_DOCKCROSS_IMAGE:-dockcross}" > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"

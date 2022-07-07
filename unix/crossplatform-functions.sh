@@ -798,6 +798,10 @@ install_reproducible_system_packages() {
     elif [ -n "${DEFAULT_DOCKCROSS_IMAGE:-}" ] || [ -e /dockcross ]; then
         true > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
         printf "#!/bin/sh\necho Run from inside the %s Docker container\n" "${DEFAULT_DOCKCROSS_IMAGE:-dockcross}" > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"
+    elif [ -x /bin/busybox ]; then
+        # minimal Alpine (often a minimal Docker container)
+        true > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
+        printf "#!/bin/sh\necho Install Busybox to run the remaining scripts\n" > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"
     else
         printf "%s\n" "TODO: unsupported install_reproducible_system_packages platform" >&2
         exit 1

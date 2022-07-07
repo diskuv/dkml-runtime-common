@@ -1725,21 +1725,25 @@ autodetect_compiler_darwin() {
         fi
 
         if [ "$autodetect_compiler_OUTPUTMODE" = LAUNCHER ]; then
+            # Hardcode locations of clang and ld since Android NDK, etc. can be in the PATH later
+            # during cross-compilation (which have their own clang/ld).
+            autodetect_compiler_darwin_CLANGEXE=$(command -v "clang")
+            autodetect_compiler_darwin_LDEXE=$(command -v "ld")
             if [ "$autodetect_compiler_PLATFORM_ARCH" = "darwin_x86_64" ] ; then
                 printf "exec %s AS='%s' ASFLAGS='%s' CC='%s' CFLAGS='%s' LD='%s' LDFLAGS='%s' " "$DKMLSYS_ENV" \
-                    "clang" \
+                    "$autodetect_compiler_darwin_CLANGEXE" \
                     "-arch x86_64 -c$autodetect_compiler_darwin_CLANG_OSXVER_OPT" \
-                    "clang" \
+                    "$autodetect_compiler_darwin_CLANGEXE" \
                     "-arch x86_64$autodetect_compiler_darwin_CLANG_OSXVER_OPT" \
-                    "ld" \
+                    "$autodetect_compiler_darwin_LDEXE" \
                     "-arch x86_64"
             elif [ "$autodetect_compiler_PLATFORM_ARCH" = "darwin_arm64" ]; then
                 printf "exec %s AS='%s' ASFLAGS='%s' CC='%s' CFLAGS='%s' LD='%s' LDFLAGS='%s' " "$DKMLSYS_ENV" \
-                    "clang" \
+                    "$autodetect_compiler_darwin_CLANGEXE" \
                     "-arch arm64 -c$autodetect_compiler_darwin_CLANG_OSXVER_OPT" \
-                    "clang" \
+                    "$autodetect_compiler_darwin_CLANGEXE" \
                     "-arch arm64$autodetect_compiler_darwin_CLANG_OSXVER_OPT" \
-                    "ld" \
+                    "$autodetect_compiler_darwin_LDEXE" \
                     "-arch arm64"
             else
                 printf "%s\n" "FATAL: check_state autodetect_compiler_darwin + unsupported arch=$autodetect_compiler_PLATFORM_ARCH" >&2

@@ -2546,8 +2546,8 @@ export_safe_tmpdir() {
   TMPDIR=$WORK
   TEMP=$WORK
   if [ -x /usr/bin/cygpath ]; then
-      TMPDIR=$(cygpath -ad "$TMPDIR")
-      TEMP=$(cygpath -ad "$TEMP")
+      TMPDIR=$(/usr/bin/cygpath -ad "$TMPDIR")
+      TEMP=$(/usr/bin/cygpath -ad "$TEMP")
   fi
   export TMPDIR
   export TEMP

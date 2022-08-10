@@ -723,7 +723,13 @@ install_reproducible_system_packages() {
             # Brew exists and its installed packages can be used in the rest of the reproducible scripts.
             install_reproducible_system_packages_OLDDIR=$PWD
             if ! cd "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTDIR"; then echo "FATAL: Could not cd to script directory" >&2; exit 107; fi
-            brew bundle dump --force # creates a Brewfile in current directory
+            #   Read-only Homebrew without any fancy interactive display
+            $DKMLSYS_ENV \
+                HOMEBREW_NO_AUTO_UPDATE=1 \
+                HOMEBREW_NO_ANALYTICS=1 \
+                HOMEBREW_NO_COLOR=1 \
+                HOMEBREW_NO_EMOJI=1 \
+                brew bundle dump --force # creates a Brewfile in current directory
             if ! cd "$install_reproducible_system_packages_OLDDIR"; then echo "FATAL: Could not cd to old directory" >&2; exit 107; fi
             $DKMLSYS_MV \
                 "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTDIR"/Brewfile \

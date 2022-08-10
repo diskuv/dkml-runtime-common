@@ -670,6 +670,10 @@ replace_all() {
 #  env:DEPLOYDIR_UNIX - The deployment directory
 #  env:BOOTSTRAPNAME - Examples include: 110co
 #  env:DKMLDIR - The directory with .dkmlroot
+#  env:DKML_REPRODUCIBLE_SYSTEM_BREWFILE - Optional Brewfile of all system packages. If the package manager
+#       is Homebrew, and this is specified, then instead of
+#       querying Homebrew with 'brew bundle dump' this Brewfile contains the result already.
+#       The file produced by 'brew bundle dump' is named 'Brewfile'.
 #  $1 - The path of the script that will be created, relative to $DEPLOYDIR_UNIX.
 #       Must end with `.sh`.
 #  $@ - All remaining arguments are how to invoke the run script ($1).
@@ -721,19 +725,27 @@ install_reproducible_system_packages() {
         # that no brew installed packages are available either. So if CMake succeeds then no brew commands were needed!
         if command -v brew >/dev/null; then
             # Brew exists and its installed packages can be used in the rest of the reproducible scripts.
-            install_reproducible_system_packages_OLDDIR=$PWD
-            if ! cd "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTDIR"; then echo "FATAL: Could not cd to script directory" >&2; exit 107; fi
-            #   Read-only Homebrew without any fancy interactive display
-            $DKMLSYS_ENV \
-                HOMEBREW_NO_AUTO_UPDATE=1 \
-                HOMEBREW_NO_ANALYTICS=1 \
-                HOMEBREW_NO_COLOR=1 \
-                HOMEBREW_NO_EMOJI=1 \
-                brew bundle dump --force # creates a Brewfile in current directory
-            if ! cd "$install_reproducible_system_packages_OLDDIR"; then echo "FATAL: Could not cd to old directory" >&2; exit 107; fi
-            $DKMLSYS_MV \
-                "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTDIR"/Brewfile \
-                "$install_reproducible_system_packages_BOOTSTRAPDIR/$install_reproducible_system_packages_PACKAGEFILE"
+            if [ -n "${DKML_REPRODUCIBLE_SYSTEM_BREWFILE:-}" ] && [ -e "${DKML_REPRODUCIBLE_SYSTEM_BREWFILE}" ]; then
+                $DKMLSYS_INSTALL \
+                    "$DKML_REPRODUCIBLE_SYSTEM_BREWFILE" \
+                    "$install_reproducible_system_packages_BOOTSTRAPDIR/$install_reproducible_system_packages_PACKAGEFILE"
+                # For troubleshooting and a bit of security, place a comment saying the Brewfile was provided not queried
+                printf "\n# This Brewfile was provided to install_reproducible_system_packages() rather than queried.\n# It is possible that this Brewfile was out of date with the system Brew bottles and taps.\n" >> "$install_reproducible_system_packages_BOOTSTRAPDIR/$install_reproducible_system_packages_PACKAGEFILE"
+            else
+                install_reproducible_system_packages_OLDDIR=$PWD
+                if ! cd "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTDIR"; then echo "FATAL: Could not cd to script directory" >&2; exit 107; fi
+                #   Read-only Homebrew without any fancy interactive display
+                $DKMLSYS_ENV \
+                    HOMEBREW_NO_AUTO_UPDATE=1 \
+                    HOMEBREW_NO_ANALYTICS=1 \
+                    HOMEBREW_NO_COLOR=1 \
+                    HOMEBREW_NO_EMOJI=1 \
+                    brew bundle dump --force # creates a Brewfile in current directory
+                if ! cd "$install_reproducible_system_packages_OLDDIR"; then echo "FATAL: Could not cd to old directory" >&2; exit 107; fi
+                $DKMLSYS_MV \
+                    "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTDIR"/Brewfile \
+                    "$install_reproducible_system_packages_BOOTSTRAPDIR/$install_reproducible_system_packages_PACKAGEFILE"
+            fi
 
             {
                 printf "%s\n" "#!/bin/sh"

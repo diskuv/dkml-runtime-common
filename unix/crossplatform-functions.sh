@@ -88,7 +88,7 @@ set_dkmlparenthomedir() {
     fi
 }
 
-# Detects DiskuvOCaml and sets its variables.
+# Detects Diskuv OCaml and sets its variables.
 #
 # If the environment variables already exist they are not overwritten.
 # Setting these variables is useful for example _during_ a deployment, where the
@@ -103,11 +103,13 @@ set_dkmlparenthomedir() {
 # - env:DiskuvOCamlMSYS2Dir - optional
 # Outputs:
 # - env:DKMLPARENTHOME_BUILDHOST
-# - env:DKMLVERSION - set if DiskuvOCaml installed. The installed version number
-# - env:DKMLHOME_BUILDHOST - set if DiskuvOCaml installed. Path will be in Windows (semicolon separated) or Unix (colon separated) format
-# - env:DKMLHOME_UNIX - set if DiskuvOCaml installed. Path will be in Unix (colon separated) format
-# - env:DKMLBINPATHS_BUILDHOST - set if DiskuvOCaml installed. Paths will be in Windows (semicolon separated) or Unix (colon separated) format
-# - env:DKMLBINPATHS_UNIX - set if DiskuvOCaml installed. Paths will be in Unix (colon separated) format
+# - env:DKMLVERSION - set if Diskuv OCaml installed. The installed version number
+# - env:DKMLHOME_BUILDHOST - set if Diskuv OCaml installed. Path will be in Windows (semicolon separated) or Unix (colon separated) format
+# - env:DKMLHOME_UNIX - set if Diskuv OCaml installed. Path will be in Unix (colon separated) format
+# - env:DKMLBINPATHS_BUILDHOST - set if Diskuv OCaml installed. Paths will be in Windows (semicolon separated) or Unix (colon separated) format
+# - env:DKMLBINPATHS_UNIX - set if Diskuv OCaml installed. Paths will be in Unix (colon separated) format
+# - env:DKMLMSYS2DIR_BUILDHOST - set if DiskuvO Caml installed MSYS2. Directory will be in Windows format
+# - env:DKMLMSYS2DIR_UNIX - set if Diskuv OCaml installed MSYS2. Directory will be in Unix format
 # Exit Code:
 # - 1 if DiskuvOCaml is not installed
 autodetect_dkmlvars() {
@@ -126,6 +128,8 @@ autodetect_dkmlvars() {
     DKMLHOME_BUILDHOST=
     DKMLBINPATHS_UNIX=
     DKMLBINPATHS_BUILDHOST=
+    DKMLMSYS2DIR_UNIX=
+    DKMLMSYS2DIR_BUILDHOST=
 
     if is_unixy_windows_build_machine; then
         if [ -e "$DKMLPARENTHOME_BUILDHOST\\dkmlvars.sh" ]; then
@@ -168,14 +172,20 @@ autodetect_dkmlvars() {
     # shellcheck disable=SC2034
     DKMLVERSION="$DiskuvOCamlVersion"
 
-    # Unixize DiskuvOCamlHome
+    # Unixize DiskuvOCamlHome and DiskuvOCamlMSYS2Dir
     if [ -x /usr/bin/cygpath ]; then
         DKMLHOME_UNIX=$(/usr/bin/cygpath -au "$DiskuvOCamlHome")
         DKMLHOME_BUILDHOST=$(/usr/bin/cygpath -aw "$DiskuvOCamlHome")
+        DKMLMSYS2DIR_UNIX=$(/usr/bin/cygpath -au "$DiskuvOCamlMSYS2Dir")
+        DKMLMSYS2DIR_BUILDHOST=$(/usr/bin/cygpath -aw "$DiskuvOCamlMSYS2Dir")
     else
         DKMLHOME_UNIX="$DiskuvOCamlHome"
         # shellcheck disable=SC2034
         DKMLHOME_BUILDHOST="$DiskuvOCamlHome"
+        # shellcheck disable=SC2034
+        DKMLMSYS2DIR_UNIX="$DiskuvOCamlMSYS2Dir"
+        # shellcheck disable=SC2034
+        DKMLMSYS2DIR_BUILDHOST="$DiskuvOCamlMSYS2Dir"
     fi
 
     # Pathize DiskuvOCamlBinaryPaths

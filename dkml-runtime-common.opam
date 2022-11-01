@@ -14,6 +14,6 @@ dev-repo: "git+https://github.com/diskuv/dkml-runtime-common.git"
 depends: []
 build: []
 install: [
-  [".\\install.cmd"  "%{_:share}%"] {os = "win32"}
-  ["./install.sh" "%{_:share}%"] {!(os = "win32")}
+  [".\\install.cmd"  "%{_:lib}%"] {os = "win32"}
+  ["./install.sh" "%{_:lib}%"] {!(os = "win32")}
 ]

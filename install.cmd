@@ -13,6 +13,7 @@ MKDIR %TARGETDIR%\unix
 MKDIR %TARGETDIR%\all\emptytop
 
 @REM Copy in binary mode so that CRLF is not added
+COPY /Y /B META                             %TARGETDIR%
 COPY /Y /B unix\_common_tool.sh             %TARGETDIR%\unix
 COPY /Y /B unix\_within_dev.sh              %TARGETDIR%\unix
 COPY /Y /B unix\crossplatform-functions.sh  %TARGETDIR%\unix

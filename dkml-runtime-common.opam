@@ -15,5 +15,5 @@ depends: []
 build: []
 install: [
   [".\\install.cmd"  "%{_:lib}%"] {os = "win32"}
-  ["./install.sh" "%{_:lib}%"] {!(os = "win32")}
+  ["./install.sh" "%{_:lib}%"]  {!(os = "win32")}
 ]

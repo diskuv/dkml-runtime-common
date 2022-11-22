@@ -642,9 +642,15 @@ print_opam_logs_on_error() {
         if [ "${DKML_BUILD_PRINT_LOGS_ON_ERROR:-}" = ON ]; then
             printf "\n\n========= [START OF TROUBLESHOOTING] ===========\n\n" >&2
 
+            if find . -maxdepth 0 -mmin -240 2>/dev/null >/dev/null; then
+                FINDARGS="-mmin -240" # is -mmin supported? BSD (incl. macOS), MSYS2, GNU
+            else
+                FINDARGS="-mtime -1" # use 1 day instead. Solaris
+            fi
+
             # print _one_ of the environment
-            # shellcheck disable=SC2030
-            find "$OPAMROOTDIR_BUILDHOST"/log -mindepth 1 -maxdepth 1 -name "*.env" ! -name "log-*.env" ! -name "ocaml-variants-*.env" | head -n1 | while read -r dump_on_error_LOG; do
+            # shellcheck disable=SC2030 disable=SC2086
+            find "$OPAMROOTDIR_BUILDHOST"/log -mindepth 1 -maxdepth 1 $FINDARGS -name "*.env" ! -name "log-*.env" ! -name "ocaml-variants-*.env" | head -n1 | while read -r dump_on_error_LOG; do
                 # shellcheck disable=SC2031
                 dump_on_error_BLOG=$(basename "$dump_on_error_LOG")
                 printf "\n\n========= [TROUBLESHOOTING] %s ===========\n# To save space, this is only one of the many similar Opam environment files that have been printed.\n\n" "$dump_on_error_BLOG" >&2
@@ -652,7 +658,8 @@ print_opam_logs_on_error() {
             done
 
             # print all output files (except ocaml-variants)
-            find "$OPAMROOTDIR_BUILDHOST"/log -mindepth 1 -maxdepth 1 -name "*.out" ! -name "log-*.out" ! -name "ocaml-variants-*.out" | while read -r dump_on_error_LOG; do
+            # shellcheck disable=SC2086
+            find "$OPAMROOTDIR_BUILDHOST"/log -mindepth 1 -maxdepth 1 $FINDARGS -name "*.out" ! -name "log-*.out" ! -name "ocaml-variants-*.out" | while read -r dump_on_error_LOG; do
                 dump_on_error_BLOG=$(basename "$dump_on_error_LOG")
                 printf "\n\n========= [TROUBLESHOOTING] %s ===========\n\n" "$dump_on_error_BLOG" >&2
                 cat "$dump_on_error_LOG" >&2

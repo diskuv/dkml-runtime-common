@@ -1,4 +1,4 @@
-# dkml-runtime-common 1.0.2-prerel11
+# dkml-runtime-common 1.0.2-prerel12
 
 Common runtime code used in DKML.
 

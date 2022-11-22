@@ -380,7 +380,8 @@ set_opamrootdir() {
 #     The name of a global switch that represents the build directory.
 #     OPAMSWITCHNAME_EXPAND works inside or outside of a container.
 # - env:WITHDKMLEXE_BUILDHOST - The location of the tools binary 'with-dkml.exe'. The binary does not
-#     need to exist yet (the tools switch may not have been created yet).
+#     need to exist yet (the tools switch may not have been created yet). The environment variable will _not_ be
+#     overwritten if it was already set.
 set_opamswitchdir_of_system() {
     set_opamswitchdir_of_system_PLATFORM=$1
     shift
@@ -421,8 +422,10 @@ set_opamswitchdir_of_system() {
         OPAMSWITCHFINALDIR_BUILDHOST="$OPAMROOTDIR_BUILDHOST${OS_DIR_SEP}${set_opamswitchdir_of_system_SWITCHBASE_UNAMBIGUOUS}"
     fi
     # Set WITHDKMLEXE_BUILDHOST
-    #   shellcheck disable=SC2034
-    WITHDKMLEXE_BUILDHOST="$OPAMSWITCHFINALDIR_BUILDHOST${OS_DIR_SEP}bin${OS_DIR_SEP}with-dkml.exe"
+    if [ -z "${WITHDKMLEXE_BUILDHOST:-}" ]; then
+        #   shellcheck disable=SC2034
+        WITHDKMLEXE_BUILDHOST="$OPAMSWITCHFINALDIR_BUILDHOST${OS_DIR_SEP}bin${OS_DIR_SEP}with-dkml.exe"
+    fi
 }
 
 # [set_opamrootandswitchdir TARGETLOCAL_OPAMSWITCH TARGETGLOBAL_OPAMSWITCH]

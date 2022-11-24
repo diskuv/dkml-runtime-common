@@ -2208,7 +2208,8 @@ autodetect_withdkmlexe() {
         return 2
     fi
     if [ -x /usr/bin/cygpath ]; then
-        # note: cygpath -ad will print a warning if the file does not exist
+        # Note: cygpath -ad will print a warning if the file does not exist.
+        #  So we checked above (`return 2`)
         WITHDKMLEXE_DOS83_OR_BUILDHOST=$(/usr/bin/cygpath -ad "$WITHDKMLEXE_BUILDHOST")
     else
         #   shellcheck disable=SC2034

@@ -126,11 +126,6 @@ trap 'PATH=/usr/bin:/bin rm -rf "$WORK"' EXIT
 # shellcheck disable=SC2034
 OPAM_ARCH_IN_WINDOWS=amd64
 #
-# Which port we will use for all the switches in Windows.
-#
-# shellcheck disable=SC2034
-OPAM_PORT_FOR_SWITCHES_IN_WINDOWS=msvc
-#
 # END
 #####
 

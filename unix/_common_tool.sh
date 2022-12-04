@@ -131,16 +131,6 @@ OPAM_ARCH_IN_WINDOWS=amd64
 # shellcheck disable=SC2034
 OPAM_PORT_FOR_SWITCHES_IN_WINDOWS=msvc
 #
-# Which variant we will use for all the switches in Windows.
-# Pick from a msys2 variant in $DiskuvOCamlHome/etc/repos/diskuv-opam-repository
-# that aligns with the OPAM_PORT_FOR_SWITCHES_IN_WINDOWS.
-set_ocaml_variant_for_windows_switches() {
-    set_ocaml_variant_for_windows_switches_VERSION="$1"
-    shift
-    export OCAML_VARIANT_FOR_SWITCHES_IN_32BIT_WINDOWS="$set_ocaml_variant_for_windows_switches_VERSION"+options+dkml+msvc32
-    export OCAML_VARIANT_FOR_SWITCHES_IN_64BIT_WINDOWS="$set_ocaml_variant_for_windows_switches_VERSION"+options+dkml+msvc64
-}
-#
 # END
 #####
 

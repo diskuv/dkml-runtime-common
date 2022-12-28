@@ -13,10 +13,12 @@ MKDIR %TARGETDIR%\unix
 MKDIR %TARGETDIR%\all\emptytop
 
 @REM Copy in binary mode so that CRLF is not added
-COPY /Y /B META                             %TARGETDIR%
+XCOPY /Y /H /N /I META                             %TARGETDIR%
 @REM   Since .template.dkmlroot goes into library, we drop the leading dot to avoid any future findlib problems
-COPY /Y /B .template.dkmlroot               %TARGETDIR%\template.dkmlroot
-COPY /Y /B unix\_common_tool.sh             %TARGETDIR%\unix
-COPY /Y /B unix\_within_dev.sh              %TARGETDIR%\unix
-COPY /Y /B unix\crossplatform-functions.sh  %TARGETDIR%\unix
-COPY /Y /B all\emptytop\dune-project        %TARGETDIR%\all\emptytop
+XCOPY /Y /H /N /I .template.dkmlroot               %TARGETDIR%
+IF EXIST %TARGETDIR%\template.dkmlroot DEL   /F /Q %TARGETDIR%\template.dkmlroot 
+REN   %TARGETDIR%\.template.dkmlroot               template.dkmlroot 
+XCOPY /Y /H /N /I unix\_common_tool.sh             %TARGETDIR%\unix
+XCOPY /Y /H /N /I unix\_within_dev.sh              %TARGETDIR%\unix
+XCOPY /Y /H /N /I unix\crossplatform-functions.sh  %TARGETDIR%\unix
+XCOPY /Y /H /N /I all\emptytop\dune-project        %TARGETDIR%\all\emptytop

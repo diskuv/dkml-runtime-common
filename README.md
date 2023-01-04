@@ -1,4 +1,4 @@
-# dkml-runtime-common 1.1.0
+# dkml-runtime-common 1.2.0
 
 Common runtime code used in DKML.
 

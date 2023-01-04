@@ -1004,8 +1004,6 @@ autodetect_cpus() {
     NUMCPUS=$(( NUMCPUS + 0 ))
     if [ "${NUMCPUS}" -lt 1 ]; then
         NUMCPUS=1
-    elif [ "${NUMCPUS}" -gt 8 ]; then
-        NUMCPUS=8
     fi
     export NUMCPUS
 }

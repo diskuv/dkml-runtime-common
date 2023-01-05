@@ -153,13 +153,12 @@ autodetect_dkmlvars() {
     if [ -n "${autodetect_dkmlvars_DiskuvOCamlDeploymentId_Override:-}" ]; then DiskuvOCamlDeploymentId="$autodetect_dkmlvars_DiskuvOCamlDeploymentId_Override"; fi
     if [ -n "${autodetect_dkmlvars_DiskuvOCamlVersion_Override:-}" ]; then DiskuvOCamlVersion="$autodetect_dkmlvars_DiskuvOCamlVersion_Override"; fi
     if [ -n "${autodetect_dkmlvars_DiskuvOCamlMSYS2Dir_Override:-}" ]; then DiskuvOCamlMSYS2Dir="$autodetect_dkmlvars_DiskuvOCamlMSYS2Dir_Override"; fi
-    # Check if any vars are still unset
+    # Check if any vars are still unset (we do the Windows-specific DiskuvOCamlMSYS2Dir a bit later)
     if [ -z "${DiskuvOCamlVarsVersion:-}" ]; then return 1; fi
     if [ -z "${DiskuvOCamlHome:-}" ]; then return 1; fi
     if [ -z "${DiskuvOCamlBinaryPaths:-}" ]; then return 1; fi
     if [ -z "${DiskuvOCamlDeploymentId:-}" ]; then return 1; fi
     if [ -z "${DiskuvOCamlVersion:-}" ]; then return 1; fi
-    if [ -z "${DiskuvOCamlMSYS2Dir:-}" ]; then return 1; fi
 
     # Validate DiskuvOCamlVarsVersion. Can be v1 or v2 since only the .sexp file changed in v2.
     if [ ! "$DiskuvOCamlVarsVersion" = "1" ] && [ ! "$DiskuvOCamlVarsVersion" = "2" ]; then
@@ -170,17 +169,26 @@ autodetect_dkmlvars() {
     # shellcheck disable=SC2034
     DKMLVERSION="$DiskuvOCamlVersion"
 
-    # Unixize DiskuvOCamlHome and DiskuvOCamlMSYS2Dir
+    # Unixize DiskuvOCamlHome
     if [ -x /usr/bin/cygpath ]; then
         DKMLHOME_UNIX=$(/usr/bin/cygpath -au "$DiskuvOCamlHome")
         DKMLHOME_BUILDHOST=$(/usr/bin/cygpath -aw "$DiskuvOCamlHome")
-        DKMLMSYS2DIR_BUILDHOST=$(/usr/bin/cygpath -aw "$DiskuvOCamlMSYS2Dir")
     else
         DKMLHOME_UNIX="$DiskuvOCamlHome"
         # shellcheck disable=SC2034
         DKMLHOME_BUILDHOST="$DiskuvOCamlHome"
+    fi
+    # Unixize DiskuvOCamlMSYS2Dir
+    if is_unixy_windows_build_machine; then
+        if [ -z "${DiskuvOCamlMSYS2Dir:-}" ]; then return 1; fi
+        if [ -x /usr/bin/cygpath ]; then
+            DKMLMSYS2DIR_BUILDHOST=$(/usr/bin/cygpath -aw "$DiskuvOCamlMSYS2Dir")
+        else
+            DKMLMSYS2DIR_BUILDHOST="$DiskuvOCamlMSYS2Dir"
+        fi
+    else
         # shellcheck disable=SC2034
-        DKMLMSYS2DIR_BUILDHOST="$DiskuvOCamlMSYS2Dir"
+        DKMLMSYS2DIR_BUILDHOST=
     fi
 
     # Pathize DiskuvOCamlBinaryPaths

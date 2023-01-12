@@ -20,6 +20,6 @@ dev-repo: "git+https://github.com/diskuv/dkml-runtime-common.git"
 #   package is a dependency of OCaml compilers like dkml-base-compiler!
 depends: []
 install: [
-  [".\\install.cmd" "%{_:lib}%"] {  os = "win32"}
+  [".\\install.cmd" "\"%{_:lib}%\""] { os = "win32"}
   ["./install.sh"   "%{_:lib}%"] {!(os = "win32")}
 ]

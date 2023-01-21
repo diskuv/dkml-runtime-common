@@ -2253,6 +2253,12 @@ log_shell() {
     fi
 }
 
+# A function that will try to print an ISO8601 timestamp, but will fallback to
+# the system default. Always uses UTC timezone.
+try_iso8601_timestamp() {
+    date -u -Iseconds 2>/dev/null || TZ=UTC date
+}
+
 # A function that will print the command and possibly time it (if and only if it uses a full path to
 # an executable, so that 'time' does not fail on internal shell functions).
 # If --return-error-code is the first argument or LOG_TRACE_RETURN_ERROR_CODE=ON, then instead of exiting the
@@ -2267,13 +2273,24 @@ log_trace() {
     fi
 
     if [ "${DKML_BUILD_TRACE:-OFF}" = ON ]; then
-        printf "%s\n" "+ $*" >&2
+        printf "[%s] %s\n" "$(try_iso8601_timestamp)" "+ $*" >&2
         if [ -x "$1" ]; then
             time "$@"
         else
             "$@"
         fi
     else
+        # use judgement so we essentially have log at an INFO level
+        case "$1" in
+        rm|cp)
+            # debug level. only show when DKML_BUILD_TRACE=ON
+            ;;
+        git|make|ocaml_configure|ocaml_make|make_host|make_target)
+            # info level. and can show entire command without polluting the screen
+            printf "[%s] %s\n" "$(try_iso8601_timestamp)" "$*" >&2
+            ;;
+        *)  printf "[%s] %s\n" "$(try_iso8601_timestamp)" "$1" >&2
+        esac
         "$@"
     fi
     log_trace_ec="$?"

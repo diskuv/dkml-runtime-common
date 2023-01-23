@@ -230,7 +230,99 @@ autodetect_ocaml_and_opam_home() {
     fi
 }
 
-# Get a path that has system binaries, and nothing else.
+__autodetect_system_path_push_git() {
+    # Add Git at beginning of PATH
+    autodetect_system_path_GITEXE=$(command -v git || true)
+    if [ -n "$autodetect_system_path_GITEXE" ]; then
+        autodetect_system_path_GITDIR=$(PATH=/usr/bin:/bin dirname "$autodetect_system_path_GITEXE")
+        case "$autodetect_system_path_GITDIR" in
+            /usr/bin|/bin)
+                # __autodetect_system_path_push_usr_bin is responsible for
+                # /usr/bin and /bin
+                ;;
+            *)
+                # Handle Scoop which places bash.exe in the same directory as
+                # git.exe.
+                # Confer: https://github.com/diskuv/dkml-installer-ocaml/issues/34
+                # Example:
+                #    ~/scoop/shims/git.exe
+                #    ~/scoop/shims/bash.exe
+                # but need the better directory:
+                #    ~/scoop/apps/git/current/cmd/git.exe
+                #    <no bash.exe!>
+                autodetect_system_path_GITGRANDDIR=$(PATH=/usr/bin:/bin dirname "$autodetect_system_path_GITDIR")
+                if [ -x "$autodetect_system_path_GITGRANDDIR/apps/git/current/cmd/git.exe" ]; then
+                    autodetect_system_path_GITDIR="$autodetect_system_path_GITGRANDDIR/apps/git/current/cmd"
+                fi
+                # Add to DKML_SYSTEM_PATH
+                if [ -n "${DKML_SYSTEM_PATH:-}" ]; then
+                    DKML_SYSTEM_PATH="$autodetect_system_path_GITDIR:$DKML_SYSTEM_PATH"
+                else
+                    DKML_SYSTEM_PATH="$autodetect_system_path_GITDIR"
+                fi
+        esac
+    fi
+}
+__autodetect_system_path_push_usr_bin() {
+    __autodetect_system_path_push_usr_bin_PATH=
+
+    if is_cygwin_build_machine; then
+        __autodetect_system_path_push_usr_bin_PATH=/usr/bin:/bin
+    elif is_msys2_msys_build_machine; then
+        # /bin is a mount (essentially a symlink) to /usr/bin on MSYS2
+        __autodetect_system_path_push_usr_bin_PATH=/usr/bin
+    else
+        __autodetect_system_path_push_usr_bin_PATH=/usr/bin:/bin
+    fi
+
+    if [ -n "${DKML_SYSTEM_PATH:-}" ]; then
+        DKML_SYSTEM_PATH="$__autodetect_system_path_push_usr_bin_PATH:$DKML_SYSTEM_PATH"
+    else
+        DKML_SYSTEM_PATH="$__autodetect_system_path_push_usr_bin_PATH"
+    fi
+}
+
+__autodetect_system_path_helper() {
+    __autodetect_system_path_helper_ORDER=$1
+    shift
+
+    export DKML_SYSTEM_PATH
+    if [ -x /usr/bin/cygpath ]; then
+        autodetect_system_path_SYSDIR=$(/usr/bin/cygpath --sysdir)
+        autodetect_system_path_WINDIR=$(/usr/bin/cygpath --windir)
+        # folder 38 = C:\Program Files typically
+        autodetect_system_path_PROGRAMFILES=$(/usr/bin/cygpath --folder 38)
+    fi
+
+    if is_cygwin_build_machine; then
+        DKML_SYSTEM_PATH=$autodetect_system_path_PROGRAMFILES/PowerShell/7:$autodetect_system_path_SYSDIR:$autodetect_system_path_WINDIR:$autodetect_system_path_SYSDIR/Wbem:$autodetect_system_path_SYSDIR/WindowsPowerShell/v1.0:$autodetect_system_path_SYSDIR/OpenSSH
+    elif is_msys2_msys_build_machine; then
+        # /bin is a mount (essentially a symlink) to /usr/bin on MSYS2
+        DKML_SYSTEM_PATH=$autodetect_system_path_PROGRAMFILES/PowerShell/7:$autodetect_system_path_SYSDIR:$autodetect_system_path_WINDIR:$autodetect_system_path_SYSDIR/Wbem:$autodetect_system_path_SYSDIR/WindowsPowerShell/v1.0:$autodetect_system_path_SYSDIR/OpenSSH
+    else
+        DKML_SYSTEM_PATH=
+    fi
+
+    case "$__autodetect_system_path_helper_ORDER" in
+        USR_BIN_FIRST)
+            __autodetect_system_path_push_git
+            __autodetect_system_path_push_usr_bin
+            ;;
+        *)
+            __autodetect_system_path_push_usr_bin
+            __autodetect_system_path_push_git
+    esac
+
+    # Set DKMLHOME_UNIX if available
+    autodetect_dkmlvars || true
+
+    # Add $DKMLHOME_UNIX/bin at beginning of PATH
+    if [ -n "${DKMLHOME_UNIX:-}" ] && [ -d "$DKMLHOME_UNIX/bin" ]; then
+        DKML_SYSTEM_PATH="$DKMLHOME_UNIX/bin:$DKML_SYSTEM_PATH"
+    fi
+}
+
+# Get a path that has system binaries, and Git, and nothing else.
 #
 # Purpose: Use whenever you have something meant to be reproducible.
 #
@@ -243,40 +335,32 @@ autodetect_ocaml_and_opam_home() {
 #   env:DKML_SYSTEM_PATH - A PATH containing only system directories like /usr/bin.
 #      The path will be in Unix format (so a path on Windows MSYS2 could be /c/Windows/System32)
 autodetect_system_path() {
-    export DKML_SYSTEM_PATH
-    if [ -x /usr/bin/cygpath ]; then
-        autodetect_system_path_SYSDIR=$(/usr/bin/cygpath --sysdir)
-        autodetect_system_path_WINDIR=$(/usr/bin/cygpath --windir)
-        # folder 38 = C:\Program Files typically
-        autodetect_system_path_PROGRAMFILES=$(/usr/bin/cygpath --folder 38)
-    fi
+    __autodetect_system_path_helper USR_BIN_FIRST
+}
 
-    if is_cygwin_build_machine; then
-        DKML_SYSTEM_PATH=/usr/bin:/bin:$autodetect_system_path_PROGRAMFILES/PowerShell/7:$autodetect_system_path_SYSDIR:$autodetect_system_path_WINDIR:$autodetect_system_path_SYSDIR/Wbem:$autodetect_system_path_SYSDIR/WindowsPowerShell/v1.0:$autodetect_system_path_SYSDIR/OpenSSH
-    elif is_msys2_msys_build_machine; then
-        # /bin is a mount (essentially a symlink) to /usr/bin on MSYS2
-        DKML_SYSTEM_PATH=/usr/bin:$autodetect_system_path_PROGRAMFILES/PowerShell/7:$autodetect_system_path_SYSDIR:$autodetect_system_path_WINDIR:$autodetect_system_path_SYSDIR/Wbem:$autodetect_system_path_SYSDIR/WindowsPowerShell/v1.0:$autodetect_system_path_SYSDIR/OpenSSH
-    else
-        DKML_SYSTEM_PATH=/usr/bin:/bin
-    fi
-
-    # Set DKMLHOME_UNIX if available
-    autodetect_dkmlvars || true
-
-    # Add Git at beginning of PATH
-    autodetect_system_path_GITEXE=$(command -v git || true)
-    if [ -n "$autodetect_system_path_GITEXE" ]; then
-        autodetect_system_path_GITDIR=$(PATH=/usr/bin:/bin dirname "$autodetect_system_path_GITEXE")
-        case "$autodetect_system_path_GITDIR" in
-            /usr/bin|/bin) ;;
-            *) DKML_SYSTEM_PATH="$autodetect_system_path_GITDIR:$DKML_SYSTEM_PATH"
-        esac
-    fi
-
-    # Add $DKMLHOME_UNIX/bin at beginning of PATH
-    if [ -n "${DKMLHOME_UNIX:-}" ] && [ -d "$DKMLHOME_UNIX/bin" ]; then
-        DKML_SYSTEM_PATH="$DKMLHOME_UNIX/bin:$DKML_SYSTEM_PATH"
-    fi
+# Get a path that has system binaries, and Git, and nothing else.
+#
+# Purpose: Use whenever you have something meant to be reproducible.
+# This function places Git before /usr/bin in the PATH. This is rarely a good idea
+# because, on Windows, package managers like Chocolately and Scoop place
+# git.exe and bash.exe in the same directory; that means their bash.exe can
+# easily conflict with whatever shell (ex. MSYS2 bash) that runs this script.
+#
+# The only situation where it makes sense is if you know you must use the
+# system git (ex. Git for Windows). In that situation you don't want any
+# private git (ex. MSYS2 from Diskuv OCaml) to be used if present (that would
+# happen if you used `autodetect_system_path`).
+#
+# On Windows this includes the Cygwin/MSYS2 paths, the  but also Windows directories
+# like C:\Windows\System32 and C:\Windows\System32\OpenSSH and Powershell directories and
+# also the essential binaries in $env:DiskuvOCamlHome\bin. The general binaries in $env:DiskuvOCamlHome\usr\bin are not
+# included.
+#
+# Output:
+#   env:DKML_SYSTEM_PATH - A PATH containing only system directories like /usr/bin.
+#      The path will be in Unix format (so a path on Windows MSYS2 could be /c/Windows/System32)
+autodetect_system_path_with_git_before_usr_bin() {
+    __autodetect_system_path_helper GIT_FIRST
 }
 
 # Get standard locations of Unix system binaries like `/usr/bin/mv` (or `/bin/mv`).

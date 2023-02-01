@@ -1254,6 +1254,22 @@ create_system_launcher() {
     "$DKMLSYS_MV" "$create_system_launcher_OUTPUTFILE".tmp "$create_system_launcher_OUTPUTFILE"
 }
 
+cmake_flag_on() {
+    # Definition at https://cmake.org/cmake/help/latest/command/if.html#basic-expressions
+    case "$1" in
+        1|ON|On|on|YES|Yes|yes|TRUE|True|true|Y|y|1*|2*|3*|4*|5*|6*|7*|8*|9*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+cmake_flag_off() {
+    # Definition at https://cmake.org/cmake/help/latest/command/if.html#basic-expressions
+    case "$1" in
+        1|ON|On|on|YES|Yes|yes|TRUE|True|true|Y|y|1*|2*|3*|4*|5*|6*|7*|8*|9*) return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
 # Detects a compiler like Visual Studio and sets its variables.
 #
 # autodetect_compiler [--sexp] OUTPUT_SCRIPT_OR_SEXP [EXTRA_PREFIX]
@@ -1703,6 +1719,20 @@ autodetect_compiler_cmake() {
                     autodetect_compiler_cmake_Specific_CXXFLAGS="$autodetect_compiler_cmake_Specific_CXXFLAGS $DKML_COMPILE_CM_CMAKE_CXX_OSX_DEPLOYMENT_TARGET_FLAG$DKML_COMPILE_CM_CMAKE_OSX_DEPLOYMENT_TARGET"
                 fi
             fi
+        fi
+
+        # == Windows ==
+
+        if [ "$DKML_COMPILE_CM_CMAKE_SYSTEM_NAME" = "Windows" ] && cmake_flag_on "${DKML_COMPILE_CM_MSVC:-}"; then
+            case "$autodetect_compiler_PLATFORM_ARCH,${DKML_COMPILE_CM_CMAKE_SIZEOF_VOID_P:-}" in
+                windows_x86_64,*)   OCAML_HOST_TRIPLET=x86_64-pc-windows ;;
+                windows_x86,*)      OCAML_HOST_TRIPLET=i686-pc-windows ;;
+                windows_arm64,*)    OCAML_HOST_TRIPLET=aarch64-pc-windows ;;
+                windows_arm32,*)    OCAML_HOST_TRIPLET=armv7-pc-windows ;;
+                *,8)                OCAML_HOST_TRIPLET=x86_64-pc-windows ;;
+                *,4)                OCAML_HOST_TRIPLET=i686-pc-windows ;;
+                *)                  OCAML_HOST_TRIPLET=i686-pc-windows ;;
+            esac
         fi
 
         # Set _CMAKE_C_FLAGS_FOR_CONFIG and _CMAKE_ASM_FLAGS_FOR_CONFIG to
@@ -2523,22 +2553,6 @@ downloadfile() {
         exit 1
     fi
     $DKMLSYS_MV "$downloadfile_FILE".tmp "$downloadfile_FILE"
-}
-
-cmake_flag_on() {
-    # Definition at https://cmake.org/cmake/help/latest/command/if.html#basic-expressions
-    case "$1" in
-        1|ON|On|on|YES|Yes|yes|TRUE|True|true|Y|y|1*|2*|3*|4*|5*|6*|7*|8*|9*) return 0 ;;
-        *) return 1 ;;
-    esac
-}
-
-cmake_flag_off() {
-    # Definition at https://cmake.org/cmake/help/latest/command/if.html#basic-expressions
-    case "$1" in
-        1|ON|On|on|YES|Yes|yes|TRUE|True|true|Y|y|1*|2*|3*|4*|5*|6*|7*|8*|9*) return 1 ;;
-        *) return 0 ;;
-    esac
 }
 
 # DEPRECATED

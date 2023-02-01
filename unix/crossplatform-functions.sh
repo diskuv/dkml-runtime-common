@@ -1463,6 +1463,17 @@ autodetect_compiler() {
         autodetect_compiler_PLATFORM_ARCH=$BUILDHOST_ARCH
     fi
 
+    # OUTPUTFILE needs to be an absolute path because `. <file>` in MSYS2's
+    # dash.exe needs explicit relative directory (ex. ./<file>) or absolute path
+    case "$autodetect_compiler_OUTPUTFILE" in
+        /*|?:*) # ex. /a/b/c or C:\Windows
+            ;;
+        *)
+            # shellcheck disable=SC2034
+            autodetect_compiler_OUTPUTFILE="$PWD/$autodetect_compiler_OUTPUTFILE" ;;
+    esac
+
+
     # Validate compile spec
     autodetect_compiler_SPECBITS=""
 
@@ -1502,7 +1513,7 @@ autodetect_compiler() {
                 fi
                 ;;
             *)
-                printf "DKML compile spec 1 was not followed. DKML_COMPILE_TYPE must be VS or CM" >&2
+                printf "DKML compile spec 1 was not followed. DKML_COMPILE_TYPE must be VS or CM\n" >&2
                 exit 107
             ;;
         esac
@@ -1611,10 +1622,10 @@ autodetect_compiler_cmake_get_config_flags() {
       printf "_CMAKE_C_FLAGS_FOR_CONFIG=\"\${DKML_COMPILE_CM_CMAKE_C_FLAGS_%s:-}\"\n" "$autodetect_compiler_cmake_get_config_flags_CONFIGUPPER"
       printf "_CMAKE_CXX_FLAGS_FOR_CONFIG=\"\${DKML_COMPILE_CM_CMAKE_CXX_FLAGS_%s:-}\"\n" "$autodetect_compiler_cmake_get_config_flags_CONFIGUPPER"
       printf "_CMAKE_ASM_FLAGS_FOR_CONFIG=\"\${DKML_COMPILE_CM_CMAKE_ASM_FLAGS_%s:-}\"\n" "$autodetect_compiler_cmake_get_config_flags_CONFIGUPPER"
-    } > "$autodetect_compiler_OUTPUTFILE".flags.source
+    } > "$autodetect_compiler_OUTPUTFILE.flags.source"
     # shellcheck disable=SC1090
-    . "$autodetect_compiler_OUTPUTFILE".flags.source
-    rm -f "$autodetect_compiler_OUTPUTFILE".flags.source
+    . "$autodetect_compiler_OUTPUTFILE.flags.source"
+    rm -f "$autodetect_compiler_OUTPUTFILE.flags.source"
 }
 
 autodetect_compiler_cmake() {

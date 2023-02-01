@@ -1109,9 +1109,11 @@ autodetect_cpus() {
 #   options necessary to cross-compile (or native compile) to the target PLATFORM. 'dev' is always
 #   a native compilation.
 # - env:WORK - Optional. If provided will be used as temporary directory
+#
+# ... If DKML_COMPILE_TYPE set to "VS" and all five (5) DKML_COMPILE_VS_* variables
+#     are specified then the chosen Visual Studio will be automatically used.
 # - env:DKML_COMPILE_SPEC - Optional. Only version "1" is supported
-# - env:DKML_COMPILE_TYPE - Optional. If set to "VS" and all five (5) DKML_COMPILE_VS_* variables
-#   are specified then the chosen Visual Studio will be automatically used.
+# - env:DKML_COMPILE_TYPE - Optional.
 # - env:DKML_COMPILE_VS_DIR - Optional. If provided it must be an installation directory of Visual Studio.
 #   The directory should contain VC and Common7 subfolders.
 # - env:DKML_COMPILE_VS_VCVARSVER - Optional. If provided it must be a version that can locate the Visual Studio
@@ -1124,6 +1126,17 @@ autodetect_cpus() {
 # - env:DKML_COMPILE_VS_CMAKEGENERATOR - Optional. If provided it must be a CMake Generator that makes use of
 #   the Visual Studio installation in DKML_COMPILE_VS_DIR. Example: `Visual Studio 16 2019`.
 #   Full list at https://cmake.org/cmake/help/v3.22/manual/cmake-generators.7.html#visual-studio-generators
+#
+# ... If all five (5) variables below are set, they will be used (although DKML_COMPILE_VS_* has higher
+#     precedence). They are directly from VsDevCmd.bat, and CLion and other IDEs sometimes set these
+#     automatically if the user (you) has already chosen a specific Visual Studio compiler.
+# - env:VSINSTALLDIR - Optional.
+# - env:VCToolsVersion - Optional.
+# - env:WindowsSDKVersion - Optional.
+# - env:VSCMD_VER - Optional.
+# - env:VisualStudioVersion - Optional.
+#
+# ... Otherwise configuration from $env:DiskuvOCamlHome/vsstudio.* is used.
 # Outputs:
 # - env:DKMLPARENTHOME_BUILDHOST
 # - env:VSDEV_HOME_UNIX is the Visual Studio installation directory containing VC and Common7 subfolders,
@@ -1155,6 +1168,32 @@ autodetect_vsdev() {
         autodetect_vsdev_VSSTUDIOWINSDKVER=$DKML_COMPILE_VS_WINSDKVER
         autodetect_vsdev_VSSTUDIOMSVSPREFERENCE=$DKML_COMPILE_VS_MSVSPREFERENCE
         autodetect_vsdev_VSSTUDIOCMAKEGENERATOR=$DKML_COMPILE_VS_CMAKEGENERATOR
+    elif [ -n "${VSINSTALLDIR:-}" ] && [ -n "${VCToolsVersion:-}" ] && [ -n "${WindowsSDKVersion:-}" ] && [ -n "${VSCMD_VER:-}" ] && [ -n "${VisualStudioVersion:-}" ]; then
+        # ex. VSINSTALLDIR=C:\DiskuvOCaml\BuildTools\ (yes, including the backslash)
+        autodetect_vsdev_VSSTUDIODIR=$(printf "%s" "$VSINSTALLDIR" | "$DKMLSYS_AWK" 'BEGIN{RS="\r\n"} {print; exit}' | "$DKMLSYS_SED" 's#\\$##')
+        # ex. 14.29.30133 (note: this is different than DKML's vsstudio.vcvars_ver.txt
+        # which is only M.N rather than M.N.O)
+        autodetect_vsdev_VSSTUDIOVCVARSVER=$(printf "%s" "$VCToolsVersion" | "$DKMLSYS_AWK" 'BEGIN{RS="\r\n"} {print; exit}')
+        # ex. 10.0.19041.0\ (yes, including the backslash)
+        #   shellcheck disable=SC2016
+        autodetect_vsdev_VSSTUDIOWINSDKVER=$(printf "%s" "$WindowsSDKVersion" | "$DKMLSYS_AWK" 'BEGIN{RS="\r\n"} {print; exit}' | "$DKMLSYS_SED" 's#\\$##')
+        # ex. VS16.11 from VSCMD_VER=16.11.3
+        #   shellcheck disable=SC2016
+        autodetect_vsdev_VSSTUDIOMSVSPREFERENCE=$(printf "VS%s" "$VSCMD_VER" | "$DKMLSYS_AWK" 'BEGIN{RS="\r\n"; FS="."} {print $1 "." $2; exit}')
+        # VisualStudioVersion=16.0 -> Visual Studio 16 2019
+        #   shellcheck disable=SC2016
+        autodetect_vsdev_VSSTUDIOVER=$(printf "%s" "$VisualStudioVersion" | "$DKMLSYS_AWK" 'BEGIN{RS="\r\n"; FS="."} {print $1; exit}')
+        case "$autodetect_vsdev_VSSTUDIOVER" in
+        11) autodetect_vsdev_VSSTUDIOCMAKEGENERATOR="Visual Studio 11 2012";;
+        12) autodetect_vsdev_VSSTUDIOCMAKEGENERATOR="Visual Studio 13 2013";;
+        14) autodetect_vsdev_VSSTUDIOCMAKEGENERATOR="Visual Studio 14 2015";;
+        15) autodetect_vsdev_VSSTUDIOCMAKEGENERATOR="Visual Studio 15 2017";;
+        16) autodetect_vsdev_VSSTUDIOCMAKEGENERATOR="Visual Studio 16 2019";;
+        17) autodetect_vsdev_VSSTUDIOCMAKEGENERATOR="Visual Studio 17 2022";;
+        *)
+          printf "ERROR: VisualStudioVersion=%s is not handled by autodetect_vsdev of crossplatform-functions.sh\n" "$VisualStudioVersion" >&2
+          return 1
+        esac
     else
         autodetect_vsdev_VSSTUDIO_DIRFILE="$DKMLPARENTHOME_BUILDHOST/vsstudio.dir.txt"
         if [ ! -e "$autodetect_vsdev_VSSTUDIO_DIRFILE" ]; then return 1; fi

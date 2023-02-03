@@ -1256,18 +1256,28 @@ create_system_launcher() {
 
 cmake_flag_on() {
     # Definition at https://cmake.org/cmake/help/latest/command/if.html#basic-expressions
-    case "$1" in
-        1|ON|On|on|YES|Yes|yes|TRUE|True|true|Y|y|1*|2*|3*|4*|5*|6*|7*|8*|9*) return 0 ;;
-        *) return 1 ;;
-    esac
+    if [ -z "$1" ]; then
+        return 1
+    else
+        case "$1" in
+            *-NOTFOUND) return 1 ;;
+            1|ON|On|on|YES|Yes|yes|TRUE|True|true|Y|y|1*|2*|3*|4*|5*|6*|7*|8*|9*) return 0 ;;
+            *) return 1 ;;
+        esac
+    fi
 }
 
 cmake_flag_off() {
     # Definition at https://cmake.org/cmake/help/latest/command/if.html#basic-expressions
-    case "$1" in
-        1|ON|On|on|YES|Yes|yes|TRUE|True|true|Y|y|1*|2*|3*|4*|5*|6*|7*|8*|9*) return 1 ;;
-        *) return 0 ;;
-    esac
+    if [ -z "$1" ]; then
+        return 0
+    else
+        case "$1" in
+            *-NOTFOUND) return 0 ;;
+            1|ON|On|on|YES|Yes|yes|TRUE|True|true|Y|y|1*|2*|3*|4*|5*|6*|7*|8*|9*) return 1 ;;
+            *) return 0 ;;
+        esac
+    fi
 }
 
 # Detects a compiler like Visual Studio and sets its variables.

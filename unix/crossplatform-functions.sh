@@ -1310,8 +1310,8 @@ cmake_flag_off() {
 #
 # Inputs:
 # - $1 - Optional. If provided, then $1/include and $1/lib are added to INCLUDE and LIB, respectively
-# - env:DKML_TARGET_ABI - This variable will select the compiler options necessary to cross-compile (or native compile)
-#   to the target PLATFORM. 'dev' is not a target platform.
+# - env:DKML_TARGET_ABI - Optional. This variable will select the compiler options necessary to cross-compile (or native compile)
+#   to the target PLATFORM. 'dev' is not a target platform. Defaults to the build host architecture.
 # - env:DKML_PREFER_CROSS_OVER_NATIVE - Optional. ON means prefer to create a cross-compiler, while OFF (the default)
 #   means to prefer to create a native compiler. The only time the preference is used is when both native and cross compilers
 #   are viable ways to produce a binary. Examples are:
@@ -1460,7 +1460,21 @@ autodetect_compiler() {
     # Set BUILDHOST_ARCH (needed before we process arguments)
     autodetect_buildhost_arch
 
-    # Process arguments
+    # Handle --post-transform hook (default does nothing)
+    autodetect_compiler_user_post_transform() {
+        true
+    }
+    if [ "$1" = --post-transform ]; then
+        shift
+        autodetect_compiler_POSTTRANSFORM=$1
+        shift
+        autodetect_compiler_user_post_transform() {
+            # shellcheck disable=SC1090
+            . "$autodetect_compiler_POSTTRANSFORM"
+        }
+    fi
+
+    # Handle output mode
     autodetect_compiler_OUTPUTMODE=LAUNCHER
     if [ "$1" = --sexp ]; then
         autodetect_compiler_OUTPUTMODE=SEXP
@@ -1474,14 +1488,14 @@ autodetect_compiler() {
     if [ -n "${WORK:-}" ]; then
         autodetect_compiler_TEMPDIR=$WORK
     elif [ -n "${_CS_DARWIN_USER_TEMP_DIR:-}" ]; then # macOS (see `man mktemp`)
-        autodetect_compiler_TEMPDIR=$(mktemp -d "$_CS_DARWIN_USER_TEMP_DIR"/dkmlc.XXXXX)
+        autodetect_compiler_TEMPDIR=$(PATH=/usr/bin:/bin mktemp -d "$_CS_DARWIN_USER_TEMP_DIR"/dkmlc.XXXXX)
     elif [ -n "${TMPDIR:-}" ]; then # macOS (see `man mktemp`)
         autodetect_compiler_TEMPDIR=$(printf "%s" "$TMPDIR" | sed 's#/$##') # remove trailing slash on macOS
-        autodetect_compiler_TEMPDIR=$(mktemp -d "$autodetect_compiler_TEMPDIR"/dkmlc.XXXXX)
+        autodetect_compiler_TEMPDIR=$(PATH=/usr/bin:/bin mktemp -d "$autodetect_compiler_TEMPDIR"/dkmlc.XXXXX)
     elif [ -n "${TMP:-}" ]; then # MSYS2 (Windows), Linux
-        autodetect_compiler_TEMPDIR=$(mktemp -d "$TMP"/dkmlc.XXXXX)
+        autodetect_compiler_TEMPDIR=$(PATH=/usr/bin:/bin mktemp -d "$TMP"/dkmlc.XXXXX)
     else
-        autodetect_compiler_TEMPDIR=$(mktemp -d /tmp/dkmlc.XXXXX)
+        autodetect_compiler_TEMPDIR=$(PATH=/usr/bin:/bin mktemp -d /tmp/dkmlc.XXXXX)
     fi
     if [ -n "${DKML_TARGET_ABI:-}" ]; then
         autodetect_compiler_PLATFORM_ARCH=$DKML_TARGET_ABI
@@ -1511,10 +1525,8 @@ autodetect_compiler() {
     [ -n "${DKML_COMPILE_CM_CONFIG:-}" ] && autodetect_compiler_SPECBITS="${autodetect_compiler_SPECBITS}a"
     [ -n "${DKML_COMPILE_CM_CMAKE_SYSTEM_NAME:-}" ] && autodetect_compiler_SPECBITS="${autodetect_compiler_SPECBITS}b"
     [ -n "${DKML_COMPILE_CM_CMAKE_C_COMPILER:-}" ] && autodetect_compiler_SPECBITS="${autodetect_compiler_SPECBITS}c"
-    [ -n "${DKML_COMPILE_CM_CMAKE_C_COMPILER_ID:-}" ] && autodetect_compiler_SPECBITS="${autodetect_compiler_SPECBITS}d"
-    [ -n "${DKML_COMPILE_CM_CMAKE_CXX_COMPILER:-}" ] && autodetect_compiler_SPECBITS="${autodetect_compiler_SPECBITS}e"
-    [ -n "${DKML_COMPILE_CM_CMAKE_CXX_COMPILER_ID:-}" ] && autodetect_compiler_SPECBITS="${autodetect_compiler_SPECBITS}f"
-    [ -n "${DKML_COMPILE_CM_CMAKE_SIZEOF_VOID_P:-}" ] && autodetect_compiler_SPECBITS="${autodetect_compiler_SPECBITS}g"
+    [ -n "${DKML_COMPILE_CM_CMAKE_CXX_COMPILER:-}" ] && autodetect_compiler_SPECBITS="${autodetect_compiler_SPECBITS}d"
+    [ -n "${DKML_COMPILE_CM_CMAKE_SIZEOF_VOID_P:-}" ] && autodetect_compiler_SPECBITS="${autodetect_compiler_SPECBITS}e"
 
     if [ -z "${DKML_COMPILE_SPEC:-}" ]; then
         if [ ! "$autodetect_compiler_SPECBITS" = "" ]; then
@@ -1533,7 +1545,7 @@ autodetect_compiler() {
                 fi
                 ;;
             CM)
-                if [ ! "$autodetect_compiler_SPECBITS" = "abcdefg" ]; then
+                if [ ! "$autodetect_compiler_SPECBITS" = "abcde" ]; then
                     printf "DKML compile spec 1 for CMake (CM) was not followed. Error code: %s\n" "$autodetect_compiler_SPECBITS" >&2
                     exit 107
                 fi
@@ -1575,6 +1587,21 @@ autodetect_compiler() {
     #   https://gitlab.com/diskuv/diskuv-ocaml/-/blob/aabf3171af67a0a0ff4779c336867a7a43e3670f/etc/opam-repositories/diskuv-opam-repo/packages/ocaml-variants/ocaml-variants.4.12.0+options+dkml+msvc64/opam#L52-62
     export OCAML_HOST_TRIPLET=
 
+    # Standardized variables
+    autodetect_compiler_CC=
+    autodetect_compiler_CXX=
+    autodetect_compiler_CFLAGS=
+    autodetect_compiler_CXXFLAGS=
+    autodetect_compiler_AS=
+    autodetect_compiler_ASFLAGS=
+    autodetect_compiler_LD=
+    autodetect_compiler_LDFLAGS=
+    autodetect_compiler_LDLIBS=
+    autodetect_compiler_MSVS_NAME=
+    autodetect_compiler_MSVS_INC=
+    autodetect_compiler_MSVS_LIB=
+    autodetect_compiler_MSVS_PATH=
+
     if [ "${DKML_BUILD_TRACE:-OFF}" = ON ] && [ "${DKML_BUILD_TRACE_LEVEL:-0}" -ge 2 ] ; then
         printf '@+ autodetect_compiler env\n' >&2
         "$DKMLSYS_ENV" | "$DKMLSYS_SED" 's/^/@env+| /' | "$DKMLSYS_AWK" '{print}' >&2
@@ -1610,7 +1637,7 @@ autodetect_compiler() {
 
     # When $WORK is not defined, we have a unique directory that needs cleaning
     if [ -z "${WORK:-}" ]; then
-        rm -rf "$autodetect_compiler_TEMPDIR"
+        $DKMLSYS_RM -rf "$autodetect_compiler_TEMPDIR"
     fi
 }
 
@@ -1630,20 +1657,13 @@ autodetect_compiler_escape_envarg() {
     "$DKMLSYS_CAT" "$@" | escape_stdin_for_single_quote
 }
 
-# Print a script snippet that will dump MSVS_NAME, MSVS64_PATH, etc. variables to standard output
-# with proper quoting
-autodetect_compiler_msvs_detect_footer() {
-  # `set` does proper quoting
-  printf "set | awk '%s'\n" '/^MS(VS|VS64)_(NAME|PATH|INC|LIB|ML)=/{print}'
-}
-
 # Sets _CMAKE_(C|ASM|CXX)_FLAGS_FOR_CONFIG environment variables to the value
 # of config-specific c_flags and asm_flags variable like
 # `DKML_COMPILE_CM_CMAKE_C_FLAGS_DEBUG` and `DKML_COMPILE_CM_CMAKE_ASM_FLAGS_DEBUG` when
 # `DKML_COMPILE_CM_CONFIG` is `Debug`.
 autodetect_compiler_cmake_get_config_flags() {
     # example command: _CMAKE_C_FLAGS_FOR_CONFIG="$DKML_COMPILE_CM_CMAKE_C_FLAGS_DEBUG"
-    autodetect_compiler_cmake_get_config_flags_CONFIGUPPER=$(printf "%s" "$DKML_COMPILE_CM_CONFIG" | tr '[:lower:]' '[:upper:]')
+    autodetect_compiler_cmake_get_config_flags_CONFIGUPPER=$(printf "%s" "$DKML_COMPILE_CM_CONFIG" | $DKMLSYS_TR '[:lower:]' '[:upper:]')
     {
       printf "_CMAKE_C_FLAGS_FOR_CONFIG=\"\${DKML_COMPILE_CM_CMAKE_C_FLAGS_%s:-}\"\n" "$autodetect_compiler_cmake_get_config_flags_CONFIGUPPER"
       printf "_CMAKE_CXX_FLAGS_FOR_CONFIG=\"\${DKML_COMPILE_CM_CMAKE_CXX_FLAGS_%s:-}\"\n" "$autodetect_compiler_cmake_get_config_flags_CONFIGUPPER"
@@ -1651,124 +1671,93 @@ autodetect_compiler_cmake_get_config_flags() {
     } > "$autodetect_compiler_OUTPUTFILE.flags.source"
     # shellcheck disable=SC1090
     . "$autodetect_compiler_OUTPUTFILE.flags.source"
-    rm -f "$autodetect_compiler_OUTPUTFILE.flags.source"
+    $DKMLSYS_RM -f "$autodetect_compiler_OUTPUTFILE.flags.source"
 }
 
-autodetect_compiler_cmake() {
+# Used by DKML's autodetect_compiler() function to customize compiler
+# variables before the variables are written to a launcher script.
+#
+# On entry autodetect_compiler() will have populated some or all of the
+# following non-export variables:
+#
+# * autodetect_compiler_CFLAGS
+# * autodetect_compiler_CC
+# * autodetect_compiler_CXX
+# * autodetect_compiler_CFLAGS
+# * autodetect_compiler_CXXFLAGS
+# * autodetect_compiler_AS
+# * autodetect_compiler_ASFLAGS
+# * autodetect_compiler_LDFLAGS
+# * autodetect_compiler_LDLIBS
+# * autodetect_compiler_MSVS_NAME
+# * autodetect_compiler_MSVS_INC. Separated by semicolons. No trailing semicolon.
+# * autodetect_compiler_MSVS_LIB. Separated by semicolons. No trailing semicolon.
+# * autodetect_compiler_MSVS_PATH. Unix PATH format with no trailing colon.
+#
+# Generally the variables conform to the description in
+# https://www.gnu.org/software/make/manual/html_node/Implicit-Variables.html.
+# The compiler will have been chosen from:
+# a) find the compiler selected/validated in the Diskuv OCaml installation
+#    (Windows) or on first-use (Unix)
+# b) the specific architecture that has been given in DKML_TARGET_ABI
+#
+# Also the function `export_binding NAME VALUE` will be available for you to
+# add custom variables (like AR, NM, OBJDUMP, etc.) to the launcher script.
+#
+# On exit the `autodetect_compiler_VARNAME` variables may be changed by this
+# script. They will then be used for github.com/ocaml/ocaml/configure.
+#
+# That is, you influence variables written to the launcher script by either:
+# a) Changing autodetect_compiler_CFLAGS (etc.). Those values will be named as
+#    CFLAGS (etc.) in the launcher script
+# b) Explicitly adding names and values with `export_binding`
+autodetect_compiler_write_output() {
+    if [ "$#" -ge 1 ] && [ "$1" = "--has-supplied-post-transform" ]; then
+        autodetect_compiler_has_supplied_post_transform=1
+        shift
+    else
+        autodetect_compiler_has_supplied_post_transform=0
+    fi
     {
-        # DKML_TARGET_SYSROOT
-        DKML_TARGET_SYSROOT=${DKML_COMPILE_CM_CMAKE_SYSROOT:-}
-
-        # Choose which assembler should be used
-        autodetect_compiler_cmake_THE_AS=
-        if [ -n "${DKML_COMPILE_CM_CMAKE_ASM_COMPILER:-}" ]; then
-            autodetect_compiler_cmake_THE_AS=$DKML_COMPILE_CM_CMAKE_ASM_COMPILER
-        elif [ -n "${DKML_COMPILE_CM_CMAKE_ASM_NASM_COMPILER:-}" ]; then
-            autodetect_compiler_cmake_THE_AS=$DKML_COMPILE_CM_CMAKE_ASM_NASM_COMPILER
-        elif [ -n "${DKML_COMPILE_CM_CMAKE_ASM_MASM_COMPILER:-}" ]; then
-            autodetect_compiler_cmake_THE_AS=$DKML_COMPILE_CM_CMAKE_ASM_MASM_COMPILER
-        fi
-
-        # Platform-specific requirements
-        # ----
-
-        autodetect_compiler_cmake_Specific_ASFLAGS=
-        autodetect_compiler_cmake_Specific_CFLAGS=
-        autodetect_compiler_cmake_Specific_CXXFLAGS=
-        autodetect_compiler_cmake_Specific_LDFLAGS=
-
-        # == Android ==
-
-        if [ "$DKML_COMPILE_CM_CMAKE_SYSTEM_NAME" = "Android" ]; then
-          # https://developer.android.com/ndk/guides/standalone_toolchain#building_open_source_projects_using_standalone_toolchains
-          # > # Tell configure what flags Android requires.
-          # > export CFLAGS="-fPIE -fPIC"
-          # > export LDFLAGS="-pie"
-          # Since they may be CMake string arrays (ex. `-fPIE;-pie`) we replace all semicolons with spaces.
-          autodetect_compiler_cmake_Specific_CFLAGS=$(printf "%s\n" "$autodetect_compiler_cmake_Specific_CFLAGS ${DKML_COMPILE_CM_CMAKE_C_COMPILE_OPTIONS_PIE:-} ${DKML_COMPILE_CM_CMAKE_C_COMPILE_OPTIONS_PIC:-}" | $DKMLSYS_SED 's/;/ /g')
-          autodetect_compiler_cmake_Specific_CXXFLAGS=$(printf "%s\n" "$autodetect_compiler_cmake_Specific_CXXFLAGS ${DKML_COMPILE_CM_CMAKE_CXX_COMPILE_OPTIONS_PIE:-} ${DKML_COMPILE_CM_CMAKE_CXX_COMPILE_OPTIONS_PIC:-}" | $DKMLSYS_SED 's/;/ /g')
-          #     For LDFLAGS since CMake does not have a linker pie options variable (ie. CMAKE_LINKER_OPTIONS_PIE) we hardcode it;
-          #     we intentionally do not use CMAKE_C_LINK_OPTIONS_PIE since that is for the C compiler (clang) not the linker (ld.lld).
-          autodetect_compiler_cmake_Specific_LDFLAGS="--pie $autodetect_compiler_cmake_Specific_LDFLAGS"
-
-          # https://developer.android.com/ndk/guides/standalone_toolchain#abi_compatibility
-          # > By default, an ARM Clang standalone toolchain will target the armeabi-v7a ABI.
-          # > To use NEON instructions, you must use the -mfpu compiler flag: -mfpu=neon.
-          # > Also, make sure to provide the following two flags to the linker: -march=armv7-a -Wl,--fix-cortex-a8.
-          # > The first flag instructs the linker to pick toolchain libraries which are tailored for armv7-a. The 2nd flag is required as a workaround for a CPU bug in some Cortex-A8 implementations.
-          # > You don't have to use any specific compiler flag when targeting the other ABIs.
-          if cmake_flag_on "${DKML_COMPILE_CM_CMAKE_ANDROID_ARM_NEON:-}"; then
-            autodetect_compiler_cmake_Specific_CFLAGS="$autodetect_compiler_cmake_Specific_CFLAGS -mfpu=neon"
-            autodetect_compiler_cmake_Specific_CXXFLAGS="$autodetect_compiler_cmake_Specific_CXXFLAGS -mfpu=neon"
-          fi
-          if [ "${DKML_COMPILE_CM_CMAKE_ANDROID_ARCH_ABI:-}" = armeabi-v7a ]; then
-            autodetect_compiler_cmake_Specific_LDFLAGS="$autodetect_compiler_cmake_Specific_LDFLAGS --fix-cortex-a8"
-            autodetect_compiler_cmake_Specific_CFLAGS="$autodetect_compiler_cmake_Specific_CFLAGS -march=armv7-a"
-            autodetect_compiler_cmake_Specific_CXXFLAGS="$autodetect_compiler_cmake_Specific_CXXFLAGS -march=armv7-a"
-          fi
-
-          # https://android.googlesource.com/platform/ndk/+/master/docs/BuildSystemMaintainers.md#additional-required-arguments
-          autodetect_compiler_cmake_NDK_MAJVER=$(printf "%s\n" "${DKML_COMPILE_CM_CMAKE_ANDROID_NDK_VERSION:-16}" | sed 's/[.].*//')
-          if [ "$autodetect_compiler_cmake_NDK_MAJVER" -lt 23 ]; then
-            autodetect_compiler_cmake_Specific_CFLAGS="$autodetect_compiler_cmake_Specific_CFLAGS -mstackrealign"
-            autodetect_compiler_cmake_Specific_CXXFLAGS="$autodetect_compiler_cmake_Specific_CXXFLAGS -mstackrealign"
-          fi
-        fi
-
-        # == Darwin ==
-
-        if [ "$DKML_COMPILE_CM_CMAKE_SYSTEM_NAME" = "Darwin" ]; then
-            if [ -n "${DKML_COMPILE_CM_CMAKE_OSX_DEPLOYMENT_TARGET:-}" ]; then
-                if [ -n "${DKML_COMPILE_CM_CMAKE_ASM_OSX_DEPLOYMENT_TARGET_FLAG:-}" ]; then
-                    autodetect_compiler_cmake_Specific_ASFLAGS="$autodetect_compiler_cmake_Specific_ASFLAGS $DKML_COMPILE_CM_CMAKE_ASM_OSX_DEPLOYMENT_TARGET_FLAG$DKML_COMPILE_CM_CMAKE_OSX_DEPLOYMENT_TARGET"
-                fi
-                if [ -n "${DKML_COMPILE_CM_CMAKE_C_OSX_DEPLOYMENT_TARGET_FLAG:-}" ]; then
-                    autodetect_compiler_cmake_Specific_CFLAGS="$autodetect_compiler_cmake_Specific_CFLAGS $DKML_COMPILE_CM_CMAKE_C_OSX_DEPLOYMENT_TARGET_FLAG$DKML_COMPILE_CM_CMAKE_OSX_DEPLOYMENT_TARGET"
-                fi
-                if [ -n "${DKML_COMPILE_CM_CMAKE_CXX_OSX_DEPLOYMENT_TARGET_FLAG:-}" ]; then
-                    autodetect_compiler_cmake_Specific_CXXFLAGS="$autodetect_compiler_cmake_Specific_CXXFLAGS $DKML_COMPILE_CM_CMAKE_CXX_OSX_DEPLOYMENT_TARGET_FLAG$DKML_COMPILE_CM_CMAKE_OSX_DEPLOYMENT_TARGET"
-                fi
-            fi
-        fi
-
-        # == Windows ==
-
-        if [ "$DKML_COMPILE_CM_CMAKE_SYSTEM_NAME" = "Windows" ] && cmake_flag_on "${DKML_COMPILE_CM_MSVC:-}"; then
-            case "$autodetect_compiler_PLATFORM_ARCH,${DKML_COMPILE_CM_CMAKE_SIZEOF_VOID_P:-}" in
-                windows_x86_64,*)   OCAML_HOST_TRIPLET=x86_64-pc-windows ;;
-                windows_x86,*)      OCAML_HOST_TRIPLET=i686-pc-windows ;;
-                windows_arm64,*)    OCAML_HOST_TRIPLET=aarch64-pc-windows ;;
-                windows_arm32,*)    OCAML_HOST_TRIPLET=armv7-pc-windows ;;
-                *,8)                OCAML_HOST_TRIPLET=x86_64-pc-windows ;;
-                *,4)                OCAML_HOST_TRIPLET=i686-pc-windows ;;
-                *)                  OCAML_HOST_TRIPLET=i686-pc-windows ;;
-            esac
-        fi
-
-        # Set _CMAKE_C_FLAGS_FOR_CONFIG and _CMAKE_ASM_FLAGS_FOR_CONFIG to
-        # $DKML_COMPILE_CM_CMAKE_C_FLAGS_DEBUG if DKML_COMPILE_CM_CONFIG=Debug, etc.
-        autodetect_compiler_cmake_get_config_flags
-
         if [ "$autodetect_compiler_OUTPUTMODE" = SEXP ]; then
             printf "(\n"
 
+            # shellcheck disable=SC2317
+            export_binding() {
+                export_binding_NAME=$1
+                shift
+                export_binding_VALUE=$1
+                shift
+                export_binding_VALUE=$(escape_arg_as_ocaml_string "$export_binding_VALUE")
+                printf "  (\"%s\" \"%s\")\n" "$export_binding_NAME" "$export_binding_VALUE"
+            }
+
+            # Post-transform
+            DKML_TARGET_ABI="$autodetect_compiler_PLATFORM_ARCH" autodetect_compiler_user_post_transform
+            if [ "$autodetect_compiler_has_supplied_post_transform" = 1 ]; then
+                autodetect_compiler_supplied_post_transform
+            fi
+
             # Universal ./configure flags
             # Reference: https://www.gnu.org/software/make/manual/html_node/Implicit-Variables.html
-            autodetect_compiler_cmake_CC=$(escape_arg_as_ocaml_string "${DKML_COMPILE_CM_CMAKE_C_COMPILER:-}")
-            printf "  (\"CC\" \"%s\")\n" "$autodetect_compiler_cmake_CC"
-            autodetect_compiler_cmake_CXX=$(escape_arg_as_ocaml_string "${DKML_COMPILE_CM_CMAKE_CXX_COMPILER:-}")
-            printf "  (\"CXX\" \"%s\")\n" "$autodetect_compiler_cmake_CXX"
-            autodetect_compiler_cmake_CFLAGS=$(escape_arg_as_ocaml_string "$autodetect_compiler_cmake_Specific_CFLAGS ${DKML_COMPILE_CM_CMAKE_C_FLAGS:-} $_CMAKE_C_FLAGS_FOR_CONFIG")
-            printf "  (\"CFLAGS\" \"%s\")\n" "$autodetect_compiler_cmake_CFLAGS"
-            autodetect_compiler_cmake_CXXFLAGS=$(escape_arg_as_ocaml_string "$autodetect_compiler_cmake_Specific_CXXFLAGS ${DKML_COMPILE_CM_CMAKE_CXX_FLAGS:-} $_CMAKE_CXX_FLAGS_FOR_CONFIG")
-            printf "  (\"CXXFLAGS\" \"%s\")\n" "$autodetect_compiler_cmake_CXXFLAGS"
-            autodetect_compiler_cmake_AS=$(escape_arg_as_ocaml_string "$autodetect_compiler_cmake_THE_AS")
-            printf "  (\"AS\" \"%s\")\n" "$autodetect_compiler_cmake_AS"
-            autodetect_compiler_cmake_ASFLAGS=$(escape_arg_as_ocaml_string "$autodetect_compiler_cmake_Specific_ASFLAGS ${DKML_COMPILE_CM_CMAKE_ASM_FLAGS:-} $_CMAKE_ASM_FLAGS_FOR_CONFIG")
-            printf "  (\"ASFLAGS\" \"%s\")\n" "$autodetect_compiler_cmake_ASFLAGS"
-            printf "  (\"LDFLAGS\" \"%s\")\n" "$autodetect_compiler_cmake_Specific_LDFLAGS"
-            printf "  (\"LDLIBS\" \"%s\")\n" "${DKML_COMPILE_CM_CMAKE_C_STANDARD_LIBRARIES:-}"
-            printf "  (\"AR\" \"%s\")\n" "${DKML_COMPILE_CM_CMAKE_AR:-}"
+            autodetect_compiler_sexp_CC=$(escape_arg_as_ocaml_string "$autodetect_compiler_CC")
+            printf "  (\"CC\" \"%s\")\n" "$autodetect_compiler_sexp_CC"
+            autodetect_compiler_sexp_CXX=$(escape_arg_as_ocaml_string "$autodetect_compiler_CXX")
+            printf "  (\"CXX\" \"%s\")\n" "$autodetect_compiler_sexp_CXX"
+            autodetect_compiler_sexp_CFLAGS=$(escape_arg_as_ocaml_string "$autodetect_compiler_CFLAGS")
+            printf "  (\"CFLAGS\" \"%s\")\n" "$autodetect_compiler_sexp_CFLAGS"
+            autodetect_compiler_sexp_CXXFLAGS=$(escape_arg_as_ocaml_string "$autodetect_compiler_CXXFLAGS")
+            printf "  (\"CXXFLAGS\" \"%s\")\n" "$autodetect_compiler_sexp_CXXFLAGS"
+            autodetect_compiler_sexp_AS=$(escape_arg_as_ocaml_string "$autodetect_compiler_AS")
+            printf "  (\"AS\" \"%s\")\n" "$autodetect_compiler_sexp_AS"
+            autodetect_compiler_sexp_ASFLAGS=$(escape_arg_as_ocaml_string "$autodetect_compiler_ASFLAGS")
+            printf "  (\"ASFLAGS\" \"%s\")\n" "$autodetect_compiler_sexp_ASFLAGS"
+            autodetect_compiler_sexp_LD=$(escape_arg_as_ocaml_string "$autodetect_compiler_LD")
+            printf "  (\"LD\" \"%s\")\n" "$autodetect_compiler_sexp_LD"
+            autodetect_compiler_sexp_LDFLAGS=$(escape_arg_as_ocaml_string "$autodetect_compiler_LDFLAGS")
+            printf "  (\"LDFLAGS\" \"%s\")\n" "$autodetect_compiler_sexp_LDFLAGS"
+            autodetect_compiler_sexp_LDLIBS=$(escape_arg_as_ocaml_string "$autodetect_compiler_LDLIBS")
+            printf "  (\"LDLIBS\" \"%s\")\n" "$autodetect_compiler_sexp_LDLIBS"
 
             # Passthrough all DKML_COMPILE_CM_* variables.
             # The first `sed` command removes any surrounding single quotes from any values.
@@ -1784,25 +1773,41 @@ autodetect_compiler_cmake() {
             printf "%s\n" "#!$DKML_POSIX_SHELL"
             printf "%s\n" "exec $DKMLSYS_ENV \\"
 
+            # shellcheck disable=SC2317
+            export_binding() {
+                export_binding_NAME=$1
+                shift
+                export_binding_VALUE=$1
+                shift
+                export_binding_VALUE=$(escape_args_for_shell "$export_binding_VALUE")
+                printf "  %s=%s %s\n" "$export_binding_NAME" "$export_binding_VALUE" "\\"
+            }
+
+            # Post-transform
+            DKML_TARGET_ABI="$autodetect_compiler_PLATFORM_ARCH" autodetect_compiler_user_post_transform
+            if [ "$autodetect_compiler_has_supplied_post_transform" = 1 ]; then
+                autodetect_compiler_supplied_post_transform
+            fi
+
             # Universal ./configure flags
-            autodetect_compiler_cmake_CC=$(escape_args_for_shell "${DKML_COMPILE_CM_CMAKE_C_COMPILER:-}")
-            printf "  CC=%s %s\n" "$autodetect_compiler_cmake_CC" "\\"
-            autodetect_compiler_cmake_CXX=$(escape_args_for_shell "${DKML_COMPILE_CM_CMAKE_CXX_COMPILER:-}")
-            printf "  CXX=%s %s\n" "$autodetect_compiler_cmake_CXX" "\\"
-            autodetect_compiler_cmake_CFLAGS=$(escape_args_for_shell "$autodetect_compiler_cmake_Specific_CFLAGS ${DKML_COMPILE_CM_CMAKE_C_FLAGS:-} $_CMAKE_C_FLAGS_FOR_CONFIG")
-            printf "  CFLAGS=%s %s\n" "$autodetect_compiler_cmake_CFLAGS" "\\"
-            autodetect_compiler_cmake_CXXFLAGS=$(escape_args_for_shell "$autodetect_compiler_cmake_Specific_CXXFLAGS ${DKML_COMPILE_CM_CMAKE_CXX_FLAGS:-} $_CMAKE_CXX_FLAGS_FOR_CONFIG")
-            printf "  CXXFLAGS=%s %s\n" "$autodetect_compiler_cmake_CXXFLAGS" "\\"
-            autodetect_compiler_cmake_AS=$(escape_args_for_shell "$autodetect_compiler_cmake_THE_AS")
-            printf "  AS=%s %s\n" "$autodetect_compiler_cmake_AS" "\\"
-            autodetect_compiler_cmake_ASFLAGS=$(escape_args_for_shell "$autodetect_compiler_cmake_Specific_ASFLAGS ${DKML_COMPILE_CM_CMAKE_ASM_FLAGS:-} $_CMAKE_ASM_FLAGS_FOR_CONFIG")
-            printf "  ASFLAGS=%s %s\n" "$autodetect_compiler_cmake_ASFLAGS" "\\"
-            autodetect_compiler_cmake_LDFLAGS=$(escape_args_for_shell "$autodetect_compiler_cmake_Specific_LDFLAGS")
-            printf "  LDFLAGS=%s %s\n" "$autodetect_compiler_cmake_LDFLAGS" "\\"
-            autodetect_compiler_cmake_LDLIBS=$(escape_args_for_shell "${DKML_COMPILE_CM_CMAKE_C_STANDARD_LIBRARIES:-}")
-            printf "  LDLIBS=%s %s\n" "$autodetect_compiler_cmake_LDLIBS" "\\"
-            autodetect_compiler_cmake_AR=$(escape_args_for_shell "${DKML_COMPILE_CM_CMAKE_AR:-}")
-            printf "  AR=%s %s\n" "$autodetect_compiler_cmake_AR" "\\"
+            autodetect_compiler_launcher_CC=$(escape_args_for_shell "$autodetect_compiler_CC")
+            printf "  CC=%s %s\n" "$autodetect_compiler_launcher_CC" "\\"
+            autodetect_compiler_launcher_CXX=$(escape_args_for_shell "$autodetect_compiler_CXX")
+            printf "  CXX=%s %s\n" "$autodetect_compiler_launcher_CXX" "\\"
+            autodetect_compiler_launcher_CFLAGS=$(escape_args_for_shell "$autodetect_compiler_CFLAGS")
+            printf "  CFLAGS=%s %s\n" "$autodetect_compiler_launcher_CFLAGS" "\\"
+            autodetect_compiler_launcher_CXXFLAGS=$(escape_args_for_shell "$autodetect_compiler_CXXFLAGS")
+            printf "  CXXFLAGS=%s %s\n" "$autodetect_compiler_launcher_CXXFLAGS" "\\"
+            autodetect_compiler_launcher_AS=$(escape_args_for_shell "$autodetect_compiler_AS")
+            printf "  AS=%s %s\n" "$autodetect_compiler_launcher_AS" "\\"
+            autodetect_compiler_launcher_ASFLAGS=$(escape_args_for_shell "$autodetect_compiler_ASFLAGS")
+            printf "  ASFLAGS=%s %s\n" "$autodetect_compiler_launcher_ASFLAGS" "\\"
+            autodetect_compiler_launcher_LD=$(escape_args_for_shell "$autodetect_compiler_LD")
+            printf "  LD=%s %s\n" "$autodetect_compiler_launcher_LD" "\\"
+            autodetect_compiler_launcher_LDFLAGS=$(escape_args_for_shell "$autodetect_compiler_LDFLAGS")
+            printf "  LDFLAGS=%s %s\n" "$autodetect_compiler_launcher_LDFLAGS" "\\"
+            autodetect_compiler_launcher_LDLIBS=$(escape_args_for_shell "$autodetect_compiler_LDLIBS")
+            printf "  LDLIBS=%s %s\n" "$autodetect_compiler_launcher_LDLIBS" "\\"
 
             # Passthrough all DKML_COMPILE_CM_* variables
             # shellcheck disable=SC2016
@@ -1811,105 +1816,353 @@ autodetect_compiler_cmake() {
             # Add arguments
             printf "%s\n" '  "$@"'
         elif [ "$autodetect_compiler_OUTPUTMODE" = MSVS_DETECT ]; then
+            printf "%s\n" "#!$DKML_POSIX_SHELL"
+            printf "set -euf\n"
+            # Use (mostly) same command line processing as real msvs-detect
+            # at https://github.com/metastack/msvs-tools/blob/master/msvs-detect
+            #   shellcheck disable=SC2016
+            printf "%s\n" '
+DEBUG=0
+MODE=0
+OUTPUT=0
+MT_REQUIRED=0
+ML_REQUIRED=0
+TARGET_ARCH=
+SCAN_ENV=0
+
+while [ $# -ne 0 ] ; do
+  case "$1" in
+    # Mode settings ($MODE)
+    -a|--all)
+      MODE=1
+      shift 1;;
+    -h|--help)
+      MODE=2
+      shift;;
+    -v|--version)
+      MODE=3
+      shift;;
+
+    # Simple flags ($MT_REQUIRED and $ML_REQUIRED)
+    --with-mt)
+      MT_REQUIRED=1
+      shift;;
+    --with-assembler)
+      ML_REQUIRED=1
+      shift;;
+
+    # -o, --output ($OUTPUT)
+    -o|--output)
+      case "$2" in
+        shell)
+          ;;
+        make)
+          OUTPUT=1;;
+        *)
+          echo "$0: unrecognised option for $1: $2">&2
+          exit 2;;
+      esac
+      shift 2;;
+    -oshell|--output=shell)
+      shift;;
+    -omake|--output=make)
+      OUTPUT=1
+      shift;;
+    -o*)
+      echo "$0: unrecognised option for -o: ${1#-o}">&2
+      exit 2;;
+    --output=*)
+      echo "$0: unrecognised option for --output: ${1#--output=}">&2
+      exit 2;;
+
+    # -x, --arch ($TARGET_ARCH)
+    -x|--arch)
+      case "$2" in
+        86|x86)
+          TARGET_ARCH=x86;;
+        64|x64)
+          TARGET_ARCH=x64;;
+        *)
+          echo "$0: unrecognised option for $1: $2">&2
+          exit 2
+      esac
+      shift 2;;
+    -x86|-xx86|--arch=x86|--arch=86)
+      TARGET_ARCH=x86
+      shift;;
+    -x64|-xx64|--arch=x64|--arch=64)
+      TARGET_ARCH=x64
+      shift;;
+    -x*)
+      echo "$0: unrecognised option for -x: ${1#-x}">&2
+      exit 2;;
+    --arch=*)
+      echo "$0: unrecognised option for --arch: ${1#--arch}">&2
+      exit 2;;
+
+    # -d, --debug ($DEBUG)
+    -d*)
+      DEBUG=${1#-d}
+      if [[ -z $DEBUG ]] ; then
+        DEBUG=1
+      fi
+      shift;;
+    --debug=*)
+      DEBUG=${1#*=}
+      shift;;
+    --debug)
+      DEBUG=1
+      shift;;
+
+    # End of option marker
+    --)
+      shift
+      break;;
+
+    # Invalid options
+    --*)
+      echo "$0: unrecognised option: ${1%%=*}">&2
+      exit 2;;
+    -*)
+      echo "$0: unrecognised option: ${1:1:1}">&2
+      exit 2;;
+
+    # MSVS_PREFERENCE (without end-of-option marker)
+    *)
+      break;;
+  esac
+done
+
+if [ -n "${1+x}" ] ; then
+  if [ $MODE -eq 1 ] ; then
+    echo "$0: cannot specify MSVS_PREFERENCE and --all">&2
+    exit 2
+  else
+    MSVS_PREFERENCE="$@"
+  fi
+fi
+'
+            printf "%s\n" "
+output_make ()
+{
+  VALUE=\$2
+  VALUE=\${VALUE//#/\\\\\\#}
+  echo \"\$1=\${VALUE//\\$/\\$\\$}\"
+}
+"
+            # shellcheck disable=SC2317
+            export_binding() {
+                true
+            }
+
+            # Post-transform
+            DKML_TARGET_ABI="$autodetect_compiler_PLATFORM_ARCH" autodetect_compiler_user_post_transform
+            if [ "$autodetect_compiler_has_supplied_post_transform" = 1 ]; then
+                autodetect_compiler_supplied_post_transform
+            fi
+
             # MSVS_NAME
-            printf "MSVS_NAME='CMake C %s compiler at %s'\n" "$DKML_COMPILE_CM_CMAKE_C_COMPILER_ID" \
-                "$DKML_COMPILE_CM_CMAKE_C_COMPILER"
+            printf "MSVS_NAME='%s'\n" "$autodetect_compiler_MSVS_NAME"
 
             # MSVS_PATH which must be in Unix PATH format with a trailing colon
-            autodetect_compiler_cmake_COMPILERUNIXDIR="$DKML_COMPILE_CM_CMAKE_C_COMPILER"
-            if [ -x /usr/bin/cygpath ]; then
-              autodetect_compiler_cmake_COMPILERUNIXDIR=$(/usr/bin/cygpath -au "$autodetect_compiler_cmake_COMPILERUNIXDIR")
-            fi
-            autodetect_compiler_cmake_COMPILERUNIXDIR=$(PATH=/usr/bin:/bin dirname "$autodetect_compiler_cmake_COMPILERUNIXDIR")
-            printf "MSVS_PATH='%s:'\n" "$autodetect_compiler_cmake_COMPILERUNIXDIR"
+            printf "MSVS_PATH='%s:'\n" "$autodetect_compiler_MSVS_PATH"
 
             # MSVS_INC which must have a trailing semicolon
-            printf "MSVS_INC='%s;'\n" "${DKML_COMPILE_CM_CMAKE_C_STANDARD_INCLUDE_DIRECTORIES:-}"
+            printf "MSVS_INC='%s;'\n" "$autodetect_compiler_MSVS_INC"
 
-            # MSVS_LIB which must have a trailing semicolon (CMake has no variables to populate this)
-            printf "MSVS_LIB=';'\n"
+            # MSVS_LIB which must have a trailing semicolon
+            printf "MSVS_LIB='%s;'\n" "$autodetect_compiler_MSVS_LIB"
 
             # MSVS_ML
-            printf "MSVS_ML='%s'\n" "$autodetect_compiler_cmake_THE_AS"
+            printf "MSVS_ML='%s'\n" "$autodetect_compiler_AS"
 
-            # Footer prints the MSVS* variables correctly to standard output
-            autodetect_compiler_msvs_detect_footer
+            #   shellcheck disable=SC2016
+            printf 'case "$OUTPUT" in\n'
+            printf '0)\n'
+            #   Print a script snippet that will dump MSVS_NAME, MSVS64_PATH, etc. variables to standard output
+            #   with proper quoting
+            #   `set` does proper quoting
+            printf "  set | awk '%s';;\n" \
+                '/^MS(VS|VS64)_(NAME|PATH|INC|LIB|ML)=/{print}'
+            printf '1)\n'
+            #   shellcheck disable=SC2016
+            printf '
+  output_make MSVS_NAME "$MSVS_NAME"
+  output_make MSVS_PATH "$MSVS_PATH"
+  output_make MSVS_INC "$MSVS_INC"
+  output_make MSVS_LIB "$MSVS_LIB"
+  output_make MSVS_ML "$MSVS_ML"
+  ;;
+'
+            printf 'esac\n'
         fi
-
     } > "$autodetect_compiler_OUTPUTFILE".tmp
     "$DKMLSYS_CHMOD" +x "$autodetect_compiler_OUTPUTFILE".tmp
     "$DKMLSYS_MV" "$autodetect_compiler_OUTPUTFILE".tmp "$autodetect_compiler_OUTPUTFILE"
 }
 
-autodetect_compiler_system() {
-    {
-        if [ "$autodetect_compiler_OUTPUTMODE" = SEXP ]; then
-            printf "(\n"
-        elif [ "$autodetect_compiler_OUTPUTMODE" = LAUNCHER ]; then
-            printf "%s\n" "#!$DKML_POSIX_SHELL"
-            printf "%s\n" "exec $DKMLSYS_ENV \\"
+autodetect_compiler_cmake() {
+    # DKML_TARGET_SYSROOT
+    DKML_TARGET_SYSROOT=${DKML_COMPILE_CM_CMAKE_SYSROOT:-}
+
+    # Choose which assembler should be used
+    autodetect_compiler_cmake_THE_AS=
+    if [ -n "${DKML_COMPILE_CM_CMAKE_ASM_COMPILER:-}" ]; then
+        autodetect_compiler_cmake_THE_AS=$DKML_COMPILE_CM_CMAKE_ASM_COMPILER
+    elif [ -n "${DKML_COMPILE_CM_CMAKE_ASM_NASM_COMPILER:-}" ]; then
+        autodetect_compiler_cmake_THE_AS=$DKML_COMPILE_CM_CMAKE_ASM_NASM_COMPILER
+    elif [ -n "${DKML_COMPILE_CM_CMAKE_ASM_MASM_COMPILER:-}" ]; then
+        autodetect_compiler_cmake_THE_AS=$DKML_COMPILE_CM_CMAKE_ASM_MASM_COMPILER
+    fi
+
+    # Platform-specific requirements
+    # ----
+
+    autodetect_compiler_cmake_Specific_ASFLAGS=
+    autodetect_compiler_cmake_Specific_CFLAGS=
+    autodetect_compiler_cmake_Specific_CXXFLAGS=
+    autodetect_compiler_cmake_Specific_LDFLAGS=
+
+    # == Android ==
+
+    if [ "$DKML_COMPILE_CM_CMAKE_SYSTEM_NAME" = "Android" ]; then
+        # https://developer.android.com/ndk/guides/standalone_toolchain#building_open_source_projects_using_standalone_toolchains
+        # > # Tell configure what flags Android requires.
+        # > export CFLAGS="-fPIE -fPIC"
+        # > export LDFLAGS="-pie"
+        # Since they may be CMake string arrays (ex. `-fPIE;-pie`) we replace all semicolons with spaces.
+        autodetect_compiler_cmake_Specific_CFLAGS=$(printf "%s\n" "$autodetect_compiler_cmake_Specific_CFLAGS ${DKML_COMPILE_CM_CMAKE_C_COMPILE_OPTIONS_PIE:-} ${DKML_COMPILE_CM_CMAKE_C_COMPILE_OPTIONS_PIC:-}" | $DKMLSYS_SED 's/;/ /g')
+        autodetect_compiler_cmake_Specific_CXXFLAGS=$(printf "%s\n" "$autodetect_compiler_cmake_Specific_CXXFLAGS ${DKML_COMPILE_CM_CMAKE_CXX_COMPILE_OPTIONS_PIE:-} ${DKML_COMPILE_CM_CMAKE_CXX_COMPILE_OPTIONS_PIC:-}" | $DKMLSYS_SED 's/;/ /g')
+        #     For LDFLAGS since CMake does not have a linker pie options variable (ie. CMAKE_LINKER_OPTIONS_PIE) we hardcode it;
+        #     we intentionally do not use CMAKE_C_LINK_OPTIONS_PIE since that is for the C compiler (clang) not the linker (ld.lld).
+        autodetect_compiler_cmake_Specific_LDFLAGS="--pie $autodetect_compiler_cmake_Specific_LDFLAGS"
+
+        # https://developer.android.com/ndk/guides/standalone_toolchain#abi_compatibility
+        # > By default, an ARM Clang standalone toolchain will target the armeabi-v7a ABI.
+        # > To use NEON instructions, you must use the -mfpu compiler flag: -mfpu=neon.
+        # > Also, make sure to provide the following two flags to the linker: -march=armv7-a -Wl,--fix-cortex-a8.
+        # > The first flag instructs the linker to pick toolchain libraries which are tailored for armv7-a. The 2nd flag is required as a workaround for a CPU bug in some Cortex-A8 implementations.
+        # > You don't have to use any specific compiler flag when targeting the other ABIs.
+        if cmake_flag_on "${DKML_COMPILE_CM_CMAKE_ANDROID_ARM_NEON:-}"; then
+        autodetect_compiler_cmake_Specific_CFLAGS="$autodetect_compiler_cmake_Specific_CFLAGS -mfpu=neon"
+        autodetect_compiler_cmake_Specific_CXXFLAGS="$autodetect_compiler_cmake_Specific_CXXFLAGS -mfpu=neon"
+        fi
+        if [ "${DKML_COMPILE_CM_CMAKE_ANDROID_ARCH_ABI:-}" = armeabi-v7a ]; then
+        autodetect_compiler_cmake_Specific_LDFLAGS="$autodetect_compiler_cmake_Specific_LDFLAGS --fix-cortex-a8"
+        autodetect_compiler_cmake_Specific_CFLAGS="$autodetect_compiler_cmake_Specific_CFLAGS -march=armv7-a"
+        autodetect_compiler_cmake_Specific_CXXFLAGS="$autodetect_compiler_cmake_Specific_CXXFLAGS -march=armv7-a"
         fi
 
-        autodetect_compiler_system_GCC=$(command -v gcc || true)
-        if [ -n "$autodetect_compiler_system_GCC" ]; then
+        # https://android.googlesource.com/platform/ndk/+/master/docs/BuildSystemMaintainers.md#additional-required-arguments
+        autodetect_compiler_cmake_NDK_MAJVER=$(printf "%s\n" "${DKML_COMPILE_CM_CMAKE_ANDROID_NDK_VERSION:-16}" | sed 's/[.].*//')
+        if [ "$autodetect_compiler_cmake_NDK_MAJVER" -lt 23 ]; then
+        autodetect_compiler_cmake_Specific_CFLAGS="$autodetect_compiler_cmake_Specific_CFLAGS -mstackrealign"
+        autodetect_compiler_cmake_Specific_CXXFLAGS="$autodetect_compiler_cmake_Specific_CXXFLAGS -mstackrealign"
+        fi
+    fi
+
+    # == Darwin ==
+
+    if [ "$DKML_COMPILE_CM_CMAKE_SYSTEM_NAME" = "Darwin" ]; then
+        if [ -n "${DKML_COMPILE_CM_CMAKE_OSX_DEPLOYMENT_TARGET:-}" ]; then
+            if [ -n "${DKML_COMPILE_CM_CMAKE_ASM_OSX_DEPLOYMENT_TARGET_FLAG:-}" ]; then
+                autodetect_compiler_cmake_Specific_ASFLAGS="$autodetect_compiler_cmake_Specific_ASFLAGS $DKML_COMPILE_CM_CMAKE_ASM_OSX_DEPLOYMENT_TARGET_FLAG$DKML_COMPILE_CM_CMAKE_OSX_DEPLOYMENT_TARGET"
+            fi
+            if [ -n "${DKML_COMPILE_CM_CMAKE_C_OSX_DEPLOYMENT_TARGET_FLAG:-}" ]; then
+                autodetect_compiler_cmake_Specific_CFLAGS="$autodetect_compiler_cmake_Specific_CFLAGS $DKML_COMPILE_CM_CMAKE_C_OSX_DEPLOYMENT_TARGET_FLAG$DKML_COMPILE_CM_CMAKE_OSX_DEPLOYMENT_TARGET"
+            fi
+            if [ -n "${DKML_COMPILE_CM_CMAKE_CXX_OSX_DEPLOYMENT_TARGET_FLAG:-}" ]; then
+                autodetect_compiler_cmake_Specific_CXXFLAGS="$autodetect_compiler_cmake_Specific_CXXFLAGS $DKML_COMPILE_CM_CMAKE_CXX_OSX_DEPLOYMENT_TARGET_FLAG$DKML_COMPILE_CM_CMAKE_OSX_DEPLOYMENT_TARGET"
+            fi
+        fi
+    fi
+
+    # == Windows ==
+
+    if [ "$DKML_COMPILE_CM_CMAKE_SYSTEM_NAME" = "Windows" ] && cmake_flag_on "${DKML_COMPILE_CM_MSVC:-}"; then
+        case "$autodetect_compiler_PLATFORM_ARCH,${DKML_COMPILE_CM_CMAKE_SIZEOF_VOID_P:-}" in
+            windows_x86_64,*)   OCAML_HOST_TRIPLET=x86_64-pc-windows ;;
+            windows_x86,*)      OCAML_HOST_TRIPLET=i686-pc-windows ;;
+            windows_arm64,*)    OCAML_HOST_TRIPLET=aarch64-pc-windows ;;
+            windows_arm32,*)    OCAML_HOST_TRIPLET=armv7-pc-windows ;;
+            *,8)                OCAML_HOST_TRIPLET=x86_64-pc-windows ;;
+            *,4)                OCAML_HOST_TRIPLET=i686-pc-windows ;;
+            *)                  OCAML_HOST_TRIPLET=i686-pc-windows ;;
+        esac
+    fi
+
+    # Set _CMAKE_C_FLAGS_FOR_CONFIG and _CMAKE_ASM_FLAGS_FOR_CONFIG to
+    # $DKML_COMPILE_CM_CMAKE_C_FLAGS_DEBUG if DKML_COMPILE_CM_CONFIG=Debug, etc.
+    autodetect_compiler_cmake_get_config_flags
+
+    # Standardized compiler environment variables
+    autodetect_compiler_CC="${DKML_COMPILE_CM_CMAKE_C_COMPILER:-}"
+    autodetect_compiler_CXX="${DKML_COMPILE_CM_CMAKE_CXX_COMPILER:-}"
+    autodetect_compiler_CFLAGS="$autodetect_compiler_cmake_Specific_CFLAGS ${DKML_COMPILE_CM_CMAKE_C_FLAGS:-} $_CMAKE_C_FLAGS_FOR_CONFIG"
+    autodetect_compiler_CXXFLAGS="$autodetect_compiler_cmake_Specific_CXXFLAGS ${DKML_COMPILE_CM_CMAKE_CXX_FLAGS:-} $_CMAKE_CXX_FLAGS_FOR_CONFIG"
+    autodetect_compiler_AS="$autodetect_compiler_cmake_THE_AS"
+    autodetect_compiler_ASFLAGS="$autodetect_compiler_cmake_Specific_ASFLAGS ${DKML_COMPILE_CM_CMAKE_ASM_FLAGS:-} $_CMAKE_ASM_FLAGS_FOR_CONFIG"
+    autodetect_compiler_LD=
+    autodetect_compiler_LDFLAGS="$autodetect_compiler_cmake_Specific_LDFLAGS"
+    autodetect_compiler_LDLIBS="${DKML_COMPILE_CM_CMAKE_C_STANDARD_LIBRARIES:-}"
+    autodetect_compiler_MSVS_NAME="CMake ${DKML_COMPILE_CM_CMAKE_C_COMPILER_ID:-C} compiler${DKML_COMPILE_CM_CMAKE_C_COMPILER:+ at $DKML_COMPILE_CM_CMAKE_C_COMPILER}"
+    autodetect_compiler_MSVS_INC="${DKML_COMPILE_CM_CMAKE_C_STANDARD_INCLUDE_DIRECTORIES:-}"
+    autodetect_compiler_MSVS_LIB= # CMake has no variables to populate this
+    autodetect_compiler_MSVS_PATH=
+    autodetect_compiler_add_parent_to_msvs_path() {
+        autodetect_compiler_add_parent_to_msvs_path_VAL=$1
+        shift
+        if [ -n "$autodetect_compiler_add_parent_to_msvs_path_VAL" ]; then
+            if [ -x /usr/bin/cygpath ]; then
+                autodetect_compiler_add_parent_to_msvs_path_VAL=$(/usr/bin/cygpath -au "$autodetect_compiler_add_parent_to_msvs_path_VAL")
+            fi
+            autodetect_compiler_add_parent_to_msvs_path_VAL=$(PATH=/usr/bin:/bin dirname "$autodetect_compiler_add_parent_to_msvs_path_VAL")
+            autodetect_compiler_MSVS_PATH="$autodetect_compiler_add_parent_to_msvs_path_VAL${autodetect_compiler_MSVS_PATH:+:$autodetect_compiler_MSVS_PATH}"
+        fi
+    }
+    autodetect_compiler_add_parent_to_msvs_path "${DKML_COMPILE_CM_CMAKE_C_COMPILER:-}"
+    autodetect_compiler_add_parent_to_msvs_path "${DKML_COMPILE_CM_CMAKE_RC_COMPILER:-}"
+
+    # Transform and write variables
+    autodetect_compiler_write_output
+}
+
+autodetect_compiler_system() {
+    # Standardized compiler environment variables
+    autodetect_compiler_CC=$(command -v gcc || true)
+    if [ -n "$autodetect_compiler_CC" ]; then
+        case "$autodetect_compiler_PLATFORM_ARCH" in
+            *_x86 | *_arm32*)
+                autodetect_compiler_CFLAGS=-m32
+                ;;
+        esac
+        autodetect_compiler_CXX=$(command -v g++ || true)
+        if [ -n "$autodetect_compiler_CXX" ]; then
             case "$autodetect_compiler_PLATFORM_ARCH" in
                 *_x86 | *_arm32*)
-                    autodetect_compiler_system_CFLAGS=-m32
+                    autodetect_compiler_CXXFLAGS=-m32
                     ;;
             esac
-            autodetect_compiler_system_GPLUSPLUS=$(command -v g++ || true)
-            if [ -n "$autodetect_compiler_system_GPLUSPLUS" ]; then
-                case "$autodetect_compiler_PLATFORM_ARCH" in
-                    *_x86 | *_arm32*)
-                        autodetect_compiler_system_CXXFLAGS=-m32
-                        ;;
-                esac
-            fi
-            autodetect_compiler_system_AS=$(command -v as || true)
-            if [ -n "$autodetect_compiler_system_AS" ]; then
-                case "$autodetect_compiler_PLATFORM_ARCH" in
-                    *_x86 | *_arm32*)
-                        autodetect_compiler_system_ASFLAGS=--32
-                        ;;
-                esac
-            fi
-            autodetect_compiler_system_LD=$(command -v ld || true)
-            if [ -n "$autodetect_compiler_system_LD" ]; then
-                case "$autodetect_compiler_PLATFORM_ARCH" in
-                    linux_x86)    autodetect_compiler_system_LDFLAGS=-melf_i386 ;;
-                    linux_x86_64) autodetect_compiler_system_LDFLAGS=-melf_x86_64 ;;
-                esac
-            fi
-            if [ "$autodetect_compiler_OUTPUTMODE" = SEXP ]; then
-                printf "  (\"CC\" \"%s\")\n" "$autodetect_compiler_system_GCC"
-                printf "  (\"CFLAGS\" \"%s\")\n" "${autodetect_compiler_system_CFLAGS:-}"
-                [ -n "${autodetect_compiler_system_GPLUSPLUS:-}" ] && printf "  (\"CXX\" \"%s\")\n" "$autodetect_compiler_system_GPLUSPLUS"
-                [ -n "${autodetect_compiler_system_GPLUSPLUS:-}" ] && printf "  (\"CXXFLAGS\" \"%s\")\n" "${autodetect_compiler_system_CXXFLAGS:-}"
-                [ -n "${autodetect_compiler_system_AS:-}" ] && printf "  (\"AS\" \"%s\")\n" "$autodetect_compiler_system_AS"
-                [ -n "${autodetect_compiler_system_AS:-}" ] && printf "  (\"ASFLAGS\" \"%s\")\n" "${autodetect_compiler_system_ASFLAGS:-}"
-                [ -n "${autodetect_compiler_system_LD:-}" ] && printf "  (\"LD\" \"%s\")\n" "$autodetect_compiler_system_LD"
-                [ -n "${autodetect_compiler_system_LD:-}" ] && printf "  (\"LDFLAGS\" \"%s\")\n" "${autodetect_compiler_system_LDFLAGS:-}"
-            elif [ "$autodetect_compiler_OUTPUTMODE" = LAUNCHER ]; then
-                printf "  CC=%s %s\n" "$autodetect_compiler_system_GCC" "\\"
-                printf "  CFLAGS=%s %s\n" "${autodetect_compiler_system_CFLAGS:-}" "\\"
-                [ -n "${autodetect_compiler_system_GPLUSPLUS:-}" ] && printf "  CXX=%s %s\n" "$autodetect_compiler_system_GPLUSPLUS" "\\"
-                [ -n "${autodetect_compiler_system_GPLUSPLUS:-}" ] && printf "  CXXFLAGS=%s %s\n" "${autodetect_compiler_system_CXXFLAGS:-}" "\\"
-                [ -n "${autodetect_compiler_system_AS:-}" ] && printf "  AS=%s %s\n" "$autodetect_compiler_system_AS" "\\"
-                [ -n "${autodetect_compiler_system_AS:-}" ] && printf "  ASFLAGS=%s %s\n" "${autodetect_compiler_system_ASFLAGS:-}" "\\"
-                [ -n "${autodetect_compiler_system_LD:-}" ] && printf "  LD=%s %s\n" "$autodetect_compiler_system_LD" "\\"
-                [ -n "${autodetect_compiler_system_LD:-}" ] && printf "  LDFLAGS=%s %s\n" "${autodetect_compiler_system_LDFLAGS:-}" "\\"
-            fi
         fi
+        autodetect_compiler_AS=$(command -v as || true)
+        if [ -n "$autodetect_compiler_AS" ]; then
+            case "$autodetect_compiler_PLATFORM_ARCH" in
+                *_x86 | *_arm32*)
+                    autodetect_compiler_ASFLAGS=--32
+                    ;;
+            esac
+        fi
+        autodetect_compiler_LD=$(command -v ld || true)
+        if [ -n "$autodetect_compiler_LD" ]; then
+            case "$autodetect_compiler_PLATFORM_ARCH" in
+                linux_x86)    autodetect_compiler_LDFLAGS=-melf_i386 ;;
+                linux_x86_64) autodetect_compiler_LDFLAGS=-melf_x86_64 ;;
+            esac
+        fi
+    fi
 
-        if [ "$autodetect_compiler_OUTPUTMODE" = SEXP ]; then
-            printf ")"
-        elif [ "$autodetect_compiler_OUTPUTMODE" = LAUNCHER ]; then
-            # Add arguments
-            printf "%s\n" '  "$@"'
-        fi
-    } > "$autodetect_compiler_OUTPUTFILE".tmp
-    "$DKMLSYS_CHMOD" +x "$autodetect_compiler_OUTPUTFILE".tmp
-    "$DKMLSYS_MV" "$autodetect_compiler_OUTPUTFILE".tmp "$autodetect_compiler_OUTPUTFILE"
+    # Transform and write variables
+    autodetect_compiler_write_output
 }
 
 # Inputs:
@@ -1920,49 +2173,27 @@ autodetect_compiler_darwin() {
         autodetect_compiler_darwin_CLANG_OSXVER_OPT=" -mmacosx-version-min=${autodetect_compiler_darwin_CLANG_OSXVER_OPT}"
     fi
 
-    {
-        if [ "$autodetect_compiler_OUTPUTMODE" = SEXP ]; then
-            printf "(\n"
-        elif [ "$autodetect_compiler_OUTPUTMODE" = LAUNCHER ]; then
-            printf "%s\n" "#!$DKML_POSIX_SHELL"
-        fi
+    # Standardized compiler environment variables
+    #   Hardcode locations of clang and ld since Android NDK, etc. can be in the PATH later
+    #   during cross-compilation (which have their own clang/ld).
+    autodetect_compiler_CC=$(command -v "clang")
+    autodetect_compiler_AS=$autodetect_compiler_CC
+    autodetect_compiler_LD=$(command -v "ld")
+    if [ "$autodetect_compiler_PLATFORM_ARCH" = "darwin_x86_64" ] ; then
+        autodetect_compiler_ASFLAGS="-arch x86_64 -c$autodetect_compiler_darwin_CLANG_OSXVER_OPT"
+        autodetect_compiler_CFLAGS="-arch x86_64$autodetect_compiler_darwin_CLANG_OSXVER_OPT"
+        autodetect_compiler_LDFLAGS="-arch x86_64"
+    elif [ "$autodetect_compiler_PLATFORM_ARCH" = "darwin_arm64" ]; then
+        autodetect_compiler_ASFLAGS="-arch arm64 -c$autodetect_compiler_darwin_CLANG_OSXVER_OPT"
+        autodetect_compiler_CFLAGS="-arch arm64$autodetect_compiler_darwin_CLANG_OSXVER_OPT"
+        autodetect_compiler_LDFLAGS="-arch arm64"
+    else
+        printf "%s\n" "FATAL: check_state autodetect_compiler_darwin + unsupported arch=$autodetect_compiler_PLATFORM_ARCH" >&2
+        exit 107
+    fi
 
-        if [ "$autodetect_compiler_OUTPUTMODE" = LAUNCHER ]; then
-            # Hardcode locations of clang and ld since Android NDK, etc. can be in the PATH later
-            # during cross-compilation (which have their own clang/ld).
-            autodetect_compiler_darwin_CLANGEXE=$(command -v "clang")
-            autodetect_compiler_darwin_LDEXE=$(command -v "ld")
-            if [ "$autodetect_compiler_PLATFORM_ARCH" = "darwin_x86_64" ] ; then
-                printf "exec %s AS='%s' ASFLAGS='%s' CC='%s' CFLAGS='%s' LD='%s' LDFLAGS='%s' " "$DKMLSYS_ENV" \
-                    "$autodetect_compiler_darwin_CLANGEXE" \
-                    "-arch x86_64 -c$autodetect_compiler_darwin_CLANG_OSXVER_OPT" \
-                    "$autodetect_compiler_darwin_CLANGEXE" \
-                    "-arch x86_64$autodetect_compiler_darwin_CLANG_OSXVER_OPT" \
-                    "$autodetect_compiler_darwin_LDEXE" \
-                    "-arch x86_64"
-            elif [ "$autodetect_compiler_PLATFORM_ARCH" = "darwin_arm64" ]; then
-                printf "exec %s AS='%s' ASFLAGS='%s' CC='%s' CFLAGS='%s' LD='%s' LDFLAGS='%s' " "$DKMLSYS_ENV" \
-                    "$autodetect_compiler_darwin_CLANGEXE" \
-                    "-arch arm64 -c$autodetect_compiler_darwin_CLANG_OSXVER_OPT" \
-                    "$autodetect_compiler_darwin_CLANGEXE" \
-                    "-arch arm64$autodetect_compiler_darwin_CLANG_OSXVER_OPT" \
-                    "$autodetect_compiler_darwin_LDEXE" \
-                    "-arch arm64"
-            else
-                printf "%s\n" "FATAL: check_state autodetect_compiler_darwin + unsupported arch=$autodetect_compiler_PLATFORM_ARCH" >&2
-                exit 107
-            fi
-        fi
-
-        if [ "$autodetect_compiler_OUTPUTMODE" = SEXP ]; then
-            printf ")"
-        elif [ "$autodetect_compiler_OUTPUTMODE" = LAUNCHER ]; then
-            # Add arguments
-            printf "%s\n" '  "$@"'
-        fi
-    } > "$autodetect_compiler_OUTPUTFILE".tmp
-    "$DKMLSYS_CHMOD" +x "$autodetect_compiler_OUTPUTFILE".tmp
-    "$DKMLSYS_MV" "$autodetect_compiler_OUTPUTFILE".tmp "$autodetect_compiler_OUTPUTFILE"
+    # Transform and write variables
+    autodetect_compiler_write_output
 }
 
 autodetect_compiler_vsdev() {
@@ -2004,7 +2235,7 @@ autodetect_compiler_vsdev() {
         printf "set > %s%s%s%s\n" '"' "$autodetect_compiler_TEMPDIR_WIN" '\vcvars.txt' '"'
     } > "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat
     #   +x for Cygwin (not needed for MSYS2)
-    chmod +x "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat
+    $DKMLSYS_CHMOD +x "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat
     if [ "${DKML_BUILD_TRACE:-OFF}" = ON ] && [ "${DKML_BUILD_TRACE_LEVEL:-0}" -ge 2 ]; then
         printf "@+: %s/vsdevcmd-and-printenv.bat\n" "$autodetect_compiler_TEMPDIR" >&2
         "$DKMLSYS_SED" 's/^/@+| /' "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat | "$DKMLSYS_AWK" '{print}' >&2
@@ -2131,6 +2362,9 @@ autodetect_compiler_vsdev() {
     # - MSVS_PREFERENCE (we will add our own)
     # - INCLUDE (we actually add this, but we also add our own vcpkg include path)
     # - LIB (we actually add this, but we also add our own vcpkg library path)
+    # - CC,CXX,CFLAGS,CXXFLAGS,AS,ASFLAGS,LD,LDFLAGS,LDLIBS,AR (these are
+    #   standardized and will be set and transformed later based on this output)
+    # - MSVS_NAME,MSVS_PATH,MSVS_INC,MSVS_LIB,MSVS_ML (also standardized)
     # - _
     # - !ExitCode
     # - TEMP, TMP
@@ -2154,6 +2388,21 @@ autodetect_compiler_vsdev() {
     $1 != "MSVS_PREFERENCE" &&
     $1 != "INCLUDE" &&
     $1 != "LIB" &&
+    $1 != "CC" &&
+    $1 != "CXX" &&
+    $1 != "CFLAGS" &&
+    $1 != "CXXFLAGS" &&
+    $1 != "AS" &&
+    $1 != "ASFLAGS" &&
+    $1 != "LD" &&
+    $1 != "LDFLAGS" &&
+    $1 != "LDLIBS" &&
+    $1 != "AR" &&
+    $1 != "MSVS_NAME" &&
+    $1 != "MSVS_PATH" &&
+    $1 != "MSVS_INC" &&
+    $1 != "MSVS_LIB" &&
+    $1 != "MSVS_ML" &&
     $1 !~ /^!ExitCode/ &&
     $1 !~ /^_$/ && $1 != "TEMP" && $1 != "TMP" && $1 != "PWD" &&
     $1 != "PROMPT" && $1 !~ /^LOGON/ && $1 !~ /APPDATA$/ &&
@@ -2221,7 +2470,61 @@ autodetect_compiler_vsdev() {
     done < "$autodetect_compiler_TEMPDIR"/vcvars_entries_unix.txt
     autodetect_compiler_COMPILER_WINDOWS_UNIQ_PATH=$(printf "%s\n" "$autodetect_compiler_COMPILER_UNIX_UNIQ_PATH" | /usr/bin/cygpath -w --path -f -)
 
-    # SEVENTH, make the launcher script or s-exp
+    # SEVENTH, Standardized compiler environment variables
+    autodetect_compiler_CC=$(PATH="$autodetect_compiler_COMPILER_PATH_UNIX" command -v cl.exe)
+    autodetect_compiler_CXX="$autodetect_compiler_CC"
+    autodetect_compiler_CFLAGS=-nologo
+    autodetect_compiler_CXXFLAGS=-nologo
+    autodetect_compiler_AS="$autodetect_compiler_vsdev_MSVS_ML"
+    autodetect_compiler_ASFLAGS=-nologo
+    autodetect_compiler_LD=$(PATH="$autodetect_compiler_COMPILER_PATH_UNIX" command -v link.exe)
+    autodetect_compiler_LDFLAGS=-nologo
+    autodetect_compiler_LDLIBS=
+    autodetect_compiler_MSVS_PATH="$autodetect_compiler_COMPILER_UNIX_UNIQ_PATH"
+
+    # === autodetect_compiler_MSVS_NAME
+    # shellcheck disable=SC2016
+    "$DKMLSYS_AWK" '
+    BEGIN{FS="="} $1 == "VSCMD_VER" {name=$1; value=$0; sub(/^[^=]*=/,"",value);                print "Visual Studio " value}
+    ' "$autodetect_compiler_TEMPDIR"/vcvars.txt > "$autodetect_compiler_TEMPDIR"/msvs1.txt
+    # shellcheck disable=SC2016
+    "$DKMLSYS_AWK" '
+    BEGIN{FS="="}
+    $1 == "VCToolsVersion" {name=$1; value=$0; sub(/^[^=]*=/,"",value);                         print "VC Tools " value}
+    ' "$autodetect_compiler_TEMPDIR"/vcvars.txt > "$autodetect_compiler_TEMPDIR"/msvs2.txt
+    # shellcheck disable=SC2016
+    "$DKMLSYS_AWK" '
+    BEGIN{FS="="}
+    $1 == "WindowsSDKVersion" {name=$1; value=$0; sub(/^[^=]*=/,"",value); sub(/\\$/,"",value); print "Windows SDK " value}
+    ' "$autodetect_compiler_TEMPDIR"/vcvars.txt > "$autodetect_compiler_TEMPDIR"/msvs3.txt
+    # shellcheck disable=SC2016
+    "$DKMLSYS_AWK" '
+    BEGIN{FS="="} $1 == "VSCMD_ARG_HOST_ARCH" {name=$1; value=$0; sub(/^[^=]*=/,"",value);      print "Host " value}
+    ' "$autodetect_compiler_TEMPDIR"/vcvars.txt > "$autodetect_compiler_TEMPDIR"/msvs4.txt
+    # shellcheck disable=SC2016
+    "$DKMLSYS_AWK" '
+    BEGIN{FS="="} $1 == "VSCMD_ARG_TGT_ARCH" {name=$1; value=$0; sub(/^[^=]*=/,"",value);       print "Target " value}
+    ' "$autodetect_compiler_TEMPDIR"/vcvars.txt > "$autodetect_compiler_TEMPDIR"/msvs5.txt
+    autodetect_compiler_MSVS1=$($DKMLSYS_CAT "$autodetect_compiler_TEMPDIR"/msvs1.txt)
+    autodetect_compiler_MSVS2=$($DKMLSYS_CAT "$autodetect_compiler_TEMPDIR"/msvs2.txt)
+    autodetect_compiler_MSVS3=$($DKMLSYS_CAT "$autodetect_compiler_TEMPDIR"/msvs3.txt)
+    autodetect_compiler_MSVS4=$($DKMLSYS_CAT "$autodetect_compiler_TEMPDIR"/msvs4.txt)
+    autodetect_compiler_MSVS5=$($DKMLSYS_CAT "$autodetect_compiler_TEMPDIR"/msvs5.txt)
+    autodetect_compiler_MSVS_NAME="$autodetect_compiler_MSVS1 $autodetect_compiler_MSVS4 $autodetect_compiler_MSVS5 $autodetect_compiler_MSVS2 $autodetect_compiler_MSVS3 $VSDEV_HOME_BUILDHOST"
+
+    # === autodetect_compiler_MSVS_INC
+    # shellcheck disable=SC2016
+    autodetect_compiler_MSVS_INC=$("$DKMLSYS_AWK" '
+    BEGIN{FS="="} $1 == "INCLUDE" {name=$1; value=$0; sub(/^[^=]*=/,"",value); print value}
+    ' "$autodetect_compiler_TEMPDIR"/vcvars.txt)
+
+    # === autodetect_compiler_MSVS_LIB
+    # shellcheck disable=SC2016
+    autodetect_compiler_MSVS_LIB=$("$DKMLSYS_AWK" '
+    BEGIN{FS="="} $1 == "LIB" {name=$1; value=$0; sub(/^[^=]*=/,"",value);     print value}
+    ' "$autodetect_compiler_TEMPDIR"/vcvars.txt)
+
+    # EIGHTH, make the launcher script or s-exp
     if [ "$autodetect_compiler_OUTPUTMODE" = SEXP ]; then
         autodetect_compiler_escape() {
             autodetect_compiler_escape_sexp "$@"
@@ -2231,17 +2534,7 @@ autodetect_compiler_vsdev() {
             autodetect_compiler_escape_envarg "$@"
         }
     fi
-    {
-        if [ "$autodetect_compiler_OUTPUTMODE" = SEXP ]; then
-            printf "(\n"
-        elif [ "$autodetect_compiler_OUTPUTMODE" = LAUNCHER ]; then
-            printf "%s\n" "#!$DKML_POSIX_SHELL"
-            if [ "${DKML_BUILD_TRACE:-}" = ON ] && [ "${DKML_BUILD_TRACE_LEVEL:-0}" -ge 2 ]; then
-                printf "%s\n" "set -x"
-            fi
-            printf "%s\n" "exec $DKMLSYS_ENV \\"
-        fi
-
+    autodetect_compiler_supplied_post_transform() {
         # Add all but PATH and MSVS_PREFERENCE, CMAKE_GENERATOR_RECOMMENDED and CMAKE_GENERATOR_INSTANCE_RECOMMENDED to launcher environment
         autodetect_compiler_escape "$autodetect_compiler_TEMPDIR"/mostvars.eval.sh | while IFS='' read -r autodetect_compiler_line; do
             if [ "$autodetect_compiler_OUTPUTMODE" = SEXP ]; then
@@ -2278,71 +2571,8 @@ autodetect_compiler_vsdev() {
             autodetect_compiler_COMPILER_ESCAPED_UNIX_UNIQ_PATH=$(printf "%s\n" "$autodetect_compiler_COMPILER_UNIX_UNIQ_PATH" | autodetect_compiler_escape_envarg)
             printf "%s\n" "  PATH='$autodetect_compiler_COMPILER_ESCAPED_UNIX_UNIQ_PATH':\"\$PATH\" \\"
         fi
-
-        # For MSVS_DETECT-only
-        if [ "$autodetect_compiler_OUTPUTMODE" = MSVS_DETECT ]; then
-            # MSVS_NAME
-            # shellcheck disable=SC2016
-            "$DKMLSYS_AWK" '
-            BEGIN{FS="="} $1 == "VSCMD_VER" {name=$1; value=$0; sub(/^[^=]*=/,"",value);                print "Visual Studio " value}
-            ' "$autodetect_compiler_TEMPDIR"/vcvars.txt > "$autodetect_compiler_TEMPDIR"/msvs1.txt
-            # shellcheck disable=SC2016
-            "$DKMLSYS_AWK" '
-            BEGIN{FS="="}
-            $1 == "VCToolsVersion" {name=$1; value=$0; sub(/^[^=]*=/,"",value);                         print "VC Tools " value}
-            ' "$autodetect_compiler_TEMPDIR"/vcvars.txt > "$autodetect_compiler_TEMPDIR"/msvs2.txt
-            # shellcheck disable=SC2016
-            "$DKMLSYS_AWK" '
-            BEGIN{FS="="}
-            $1 == "WindowsSDKVersion" {name=$1; value=$0; sub(/^[^=]*=/,"",value); sub(/\\$/,"",value); print "Windows SDK " value}
-            ' "$autodetect_compiler_TEMPDIR"/vcvars.txt > "$autodetect_compiler_TEMPDIR"/msvs3.txt
-            # shellcheck disable=SC2016
-            "$DKMLSYS_AWK" '
-            BEGIN{FS="="} $1 == "VSCMD_ARG_HOST_ARCH" {name=$1; value=$0; sub(/^[^=]*=/,"",value);      print "Host " value}
-            ' "$autodetect_compiler_TEMPDIR"/vcvars.txt > "$autodetect_compiler_TEMPDIR"/msvs4.txt
-            # shellcheck disable=SC2016
-            "$DKMLSYS_AWK" '
-            BEGIN{FS="="} $1 == "VSCMD_ARG_TGT_ARCH" {name=$1; value=$0; sub(/^[^=]*=/,"",value);       print "Target " value}
-            ' "$autodetect_compiler_TEMPDIR"/vcvars.txt > "$autodetect_compiler_TEMPDIR"/msvs5.txt
-            autodetect_compiler_MSVS1=$(cat "$autodetect_compiler_TEMPDIR"/msvs1.txt)
-            autodetect_compiler_MSVS2=$(cat "$autodetect_compiler_TEMPDIR"/msvs2.txt)
-            autodetect_compiler_MSVS3=$(cat "$autodetect_compiler_TEMPDIR"/msvs3.txt)
-            autodetect_compiler_MSVS4=$(cat "$autodetect_compiler_TEMPDIR"/msvs4.txt)
-            autodetect_compiler_MSVS5=$(cat "$autodetect_compiler_TEMPDIR"/msvs5.txt)
-            printf "MSVS_NAME='%s %s %s %s %s in %s'\n" "$autodetect_compiler_MSVS1" \
-                "$autodetect_compiler_MSVS4" "$autodetect_compiler_MSVS5" \
-                "$autodetect_compiler_MSVS2" "$autodetect_compiler_MSVS3" "$VSDEV_HOME_BUILDHOST"
-
-            # MSVS_PATH which must be in Unix PATH format with a trailing colon
-            printf "MSVS_PATH='%s:'\n" "$autodetect_compiler_COMPILER_UNIX_UNIQ_PATH"
-
-            # MSVS_INC which must have a trailing semicolon
-            # shellcheck disable=SC2016
-            "$DKMLSYS_AWK" -v singlequote="'" '
-            BEGIN{FS="="} $1 == "INCLUDE" {name=$1; value=$0; sub(/^[^=]*=/,"",value); print "MSVS_INC=" singlequote value ";" singlequote}
-            ' "$autodetect_compiler_TEMPDIR"/vcvars.txt
-
-            # MSVS_LIB which must have a trailing semicolon
-            # shellcheck disable=SC2016
-            "$DKMLSYS_AWK" -v singlequote="'" '
-            BEGIN{FS="="} $1 == "LIB" {name=$1; value=$0; sub(/^[^=]*=/,"",value);     print "MSVS_LIB=" singlequote value ";" singlequote}
-            ' "$autodetect_compiler_TEMPDIR"/vcvars.txt
-
-            # MSVS_ML
-            printf "MSVS_ML='%s'\n" "$autodetect_compiler_vsdev_MSVS_ML"
-        fi
-
-        if [ "$autodetect_compiler_OUTPUTMODE" = SEXP ]; then
-            printf ")"
-        elif [ "$autodetect_compiler_OUTPUTMODE" = LAUNCHER ]; then
-            # Add arguments
-            printf "%s\n" '  "$@"'
-        elif [ "$autodetect_compiler_OUTPUTMODE" = MSVS_DETECT ]; then
-            autodetect_compiler_msvs_detect_footer
-        fi
-    } > "$autodetect_compiler_OUTPUTFILE".tmp
-    "$DKMLSYS_CHMOD" +x "$autodetect_compiler_OUTPUTFILE".tmp
-    "$DKMLSYS_MV" "$autodetect_compiler_OUTPUTFILE".tmp "$autodetect_compiler_OUTPUTFILE"
+    }
+    autodetect_compiler_write_output --has-supplied-post-transform
 }
 
 # Set WITHDKMLEXE_BUILDHOST and WITHDKMLEXE_DOS83_OR_BUILDHOST.

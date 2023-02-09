@@ -294,13 +294,21 @@ __autodetect_system_path_helper() {
         autodetect_system_path_PROGRAMFILES=$(/usr/bin/cygpath --folder 38)
     fi
 
-    if is_cygwin_build_machine; then
-        DKML_SYSTEM_PATH=$autodetect_system_path_PROGRAMFILES/PowerShell/7:$autodetect_system_path_SYSDIR:$autodetect_system_path_WINDIR:$autodetect_system_path_SYSDIR/Wbem:$autodetect_system_path_SYSDIR/WindowsPowerShell/v1.0:$autodetect_system_path_SYSDIR/OpenSSH
-    elif is_msys2_msys_build_machine; then
-        # /bin is a mount (essentially a symlink) to /usr/bin on MSYS2
+    if is_cygwin_build_machine || is_msys2_msys_build_machine; then
         DKML_SYSTEM_PATH=$autodetect_system_path_PROGRAMFILES/PowerShell/7:$autodetect_system_path_SYSDIR:$autodetect_system_path_WINDIR:$autodetect_system_path_SYSDIR/Wbem:$autodetect_system_path_SYSDIR/WindowsPowerShell/v1.0:$autodetect_system_path_SYSDIR/OpenSSH
     else
         DKML_SYSTEM_PATH=
+        # RHEL has a Developer Toolset which should be in the path for things
+        # like the latest GCC compilers. It is used, for example, by dockcross Linux.
+        # Confer: https://access.redhat.com/documentation/en-us/red_hat_developer_toolset/12/html/12.0_release_notes/index
+        if [ -e /opt/rh ]; then
+            for __autodetect_system_path_helper_I in 19 18 17 16 15 14 13 12 11 10 9 8 7 6 4; do
+                if [ -d /opt/rh/devtoolset-$__autodetect_system_path_helper_I/root/usr/bin ]; then
+                    DKML_SYSTEM_PATH=/opt/rh/devtoolset-$__autodetect_system_path_helper_I/root/usr/bin
+                    break
+                fi
+            done
+        fi
     fi
 
     case "$__autodetect_system_path_helper_ORDER" in

@@ -2471,13 +2471,24 @@ autodetect_compiler_vsdev() {
     autodetect_compiler_COMPILER_WINDOWS_UNIQ_PATH=$(printf "%s\n" "$autodetect_compiler_COMPILER_UNIX_UNIQ_PATH" | /usr/bin/cygpath -w --path -f -)
 
     # SEVENTH, Standardized compiler environment variables
+    #   When compiling opam, the opam ./configure cannot handle spaces. Probably
+    #   many other programs as well. So use [cygpath -d]
     autodetect_compiler_CC=$(PATH="$autodetect_compiler_COMPILER_PATH_UNIX" command -v cl.exe)
+    if [ -x /usr/bin/cygpath ] && [ -e "$autodetect_compiler_CC" ]; then
+        autodetect_compiler_CC=$(/usr/bin/cygpath -d "$autodetect_compiler_CC")
+    fi
     autodetect_compiler_CXX="$autodetect_compiler_CC"
     autodetect_compiler_CFLAGS=-nologo
     autodetect_compiler_CXXFLAGS=-nologo
     autodetect_compiler_AS="$autodetect_compiler_vsdev_MSVS_ML"
+    if [ -x /usr/bin/cygpath ] && [ -e "$autodetect_compiler_AS" ]; then
+        autodetect_compiler_AS=$(/usr/bin/cygpath -d "$autodetect_compiler_AS")
+    fi
     autodetect_compiler_ASFLAGS=-nologo
     autodetect_compiler_LD=$(PATH="$autodetect_compiler_COMPILER_PATH_UNIX" command -v link.exe)
+    if [ -x /usr/bin/cygpath ] && [ -e "$autodetect_compiler_LD" ]; then
+        autodetect_compiler_LD=$(/usr/bin/cygpath -d "$autodetect_compiler_LD")
+    fi
     autodetect_compiler_LDFLAGS=-nologo
     autodetect_compiler_LDLIBS=
     autodetect_compiler_MSVS_PATH="$autodetect_compiler_COMPILER_UNIX_UNIQ_PATH"

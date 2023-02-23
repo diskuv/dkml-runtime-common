@@ -259,6 +259,7 @@ set_opamexe() {
 # A side-effect of this call is that `opam init` may be called.
 #
 # Inputs:
+# - env:DKML_OPAM_ROOT - If specified, uses <DKML_OPAM_ROOT> as the Opam root
 # - env:STATEDIR - If specified, uses <STATEDIR>/opam as the Opam root
 # - env:OPAMHOME - If specified, use <OPAMHOME>/bin/opam or <OPAMHOME>/bin/opam.exe
 # Outputs:
@@ -268,7 +269,10 @@ set_opamexe() {
 #     For known versions of Opam this is equivalent to OPAMROOTDIR_BUILDHOST.
 set_opamrootdir() {
     set_opamexe
-    if [ -n "${STATEDIR:-}" ]; then
+    if [ -n "${DKML_OPAM_ROOT:-}" ]; then
+        OPAMROOTDIR_BUILDHOST="$DKML_OPAM_ROOT"
+        if [ -x /usr/bin/cygpath ]; then OPAMROOTDIR_BUILDHOST=$(/usr/bin/cygpath -aw "$OPAMROOTDIR_BUILDHOST"); fi
+    elif [ -n "${STATEDIR:-}" ]; then
         OPAMROOTDIR_BUILDHOST="$STATEDIR/opam"
         if [ -x /usr/bin/cygpath ]; then OPAMROOTDIR_BUILDHOST=$(/usr/bin/cygpath -aw "$OPAMROOTDIR_BUILDHOST"); fi
     elif is_unixy_windows_build_machine; then
@@ -329,6 +333,7 @@ set_opamrootdir() {
 # - env:DKSDK_INVOCATION - Optional. If ON the name of the switch will end in dksdk-${DKML_HOST_ABI}
 #   rather than dkml. The DKSDK system switch uses a system compiler (not a base compiler), so
 #   the DKML and DKSDK switches must be segregated.
+# - env:DKML_OPAM_ROOT - If specified, uses <DKML_OPAM_ROOT> as the Opam root
 # - env:STATEDIR
 # Outputs:
 # - env:OPAMSWITCHFINALDIR_BUILDHOST - Either:
@@ -363,12 +368,12 @@ set_opamswitchdir_of_system() {
         set_opamswitchdir_of_system_SWITCHBASE_UNAMBIGUOUS="dkml"
     fi
 
-    # Set OPAMROOTDIR_BUILDHOST
+    # Set OPAMROOTDIR_BUILDHOST (uses DKML_OPAM_ROOT and/or STATEDIR when set)
     set_opamrootdir
     # Set DKMLHOME_UNIX if available
     autodetect_dkmlvars || true
     # Set OPAMSWITCHFINALDIR_BUILDHOST and OPAMSWITCHNAME_EXPAND
-    if [ -n "${STATEDIR:-}" ]; then
+    if [ -n "${DKML_OPAM_ROOT:-}" ] || [ -n "${STATEDIR:-}" ]; then
         OPAMSWITCHNAME_EXPAND="${set_opamswitchdir_of_system_SWITCHBASE}"
         OPAMSWITCHFINALDIR_BUILDHOST="$OPAMROOTDIR_BUILDHOST${OS_DIR_SEP}${set_opamswitchdir_of_system_SWITCHBASE}"
     elif [ -n "${DKMLHOME_BUILDHOST:-}" ]; then

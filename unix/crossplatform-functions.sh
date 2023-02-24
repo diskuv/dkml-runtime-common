@@ -1533,8 +1533,7 @@ autodetect_compiler() {
     [ -n "${DKML_COMPILE_CM_CONFIG:-}" ] && autodetect_compiler_SPECBITS="${autodetect_compiler_SPECBITS}a"
     [ -n "${DKML_COMPILE_CM_CMAKE_SYSTEM_NAME:-}" ] && autodetect_compiler_SPECBITS="${autodetect_compiler_SPECBITS}b"
     [ -n "${DKML_COMPILE_CM_CMAKE_C_COMPILER:-}" ] && autodetect_compiler_SPECBITS="${autodetect_compiler_SPECBITS}c"
-    [ -n "${DKML_COMPILE_CM_CMAKE_CXX_COMPILER:-}" ] && autodetect_compiler_SPECBITS="${autodetect_compiler_SPECBITS}d"
-    [ -n "${DKML_COMPILE_CM_CMAKE_SIZEOF_VOID_P:-}" ] && autodetect_compiler_SPECBITS="${autodetect_compiler_SPECBITS}e"
+    [ -n "${DKML_COMPILE_CM_CMAKE_SIZEOF_VOID_P:-}" ] && autodetect_compiler_SPECBITS="${autodetect_compiler_SPECBITS}d"
 
     if [ -z "${DKML_COMPILE_SPEC:-}" ]; then
         if [ ! "$autodetect_compiler_SPECBITS" = "" ]; then
@@ -1553,7 +1552,7 @@ autodetect_compiler() {
                 fi
                 ;;
             CM)
-                if [ ! "$autodetect_compiler_SPECBITS" = "abcde" ]; then
+                if [ ! "$autodetect_compiler_SPECBITS" = "abcd" ]; then
                     printf "DKML compile spec 1 for CMake (CM) was not followed. Error code: %s\n" "$autodetect_compiler_SPECBITS" >&2
                     exit 107
                 fi

@@ -1694,6 +1694,7 @@ autodetect_compiler_cmake_get_config_flags() {
 # * autodetect_compiler_CXXFLAGS
 # * autodetect_compiler_AS
 # * autodetect_compiler_ASFLAGS
+# * autodetect_compiler_LD
 # * autodetect_compiler_LDFLAGS
 # * autodetect_compiler_LDLIBS
 # * autodetect_compiler_MSVS_NAME
@@ -2109,7 +2110,7 @@ autodetect_compiler_cmake() {
     autodetect_compiler_CXXFLAGS="$autodetect_compiler_cmake_Specific_CXXFLAGS ${DKML_COMPILE_CM_CMAKE_CXX_FLAGS:-} $_CMAKE_CXX_FLAGS_FOR_CONFIG"
     autodetect_compiler_AS="$autodetect_compiler_cmake_THE_AS"
     autodetect_compiler_ASFLAGS="$autodetect_compiler_cmake_Specific_ASFLAGS ${DKML_COMPILE_CM_CMAKE_ASM_FLAGS:-} $_CMAKE_ASM_FLAGS_FOR_CONFIG"
-    autodetect_compiler_LD=
+    autodetect_compiler_LD="${DKML_COMPILE_CM_CMAKE_LINKER:-}"
     autodetect_compiler_LDFLAGS="$autodetect_compiler_cmake_Specific_LDFLAGS"
     autodetect_compiler_LDLIBS="${DKML_COMPILE_CM_CMAKE_C_STANDARD_LIBRARIES:-}"
     autodetect_compiler_MSVS_NAME="CMake ${DKML_COMPILE_CM_CMAKE_C_COMPILER_ID:-C} compiler${DKML_COMPILE_CM_CMAKE_C_COMPILER:+ at $DKML_COMPILE_CM_CMAKE_C_COMPILER}"

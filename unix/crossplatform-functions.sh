@@ -2285,32 +2285,28 @@ autodetect_compiler_vsdev() {
                 autodetect_compiler_vsdev_dump_vars_helper -arch=x86
             }
             OCAML_HOST_TRIPLET=i686-pc-windows
-            autodetect_compiler_vsdev_VALIDATECMD="ml.exe"
-            autodetect_compiler_vsdev_MSVS_ML="ml"
+            autodetect_compiler_vsdev_VALIDATE_ASM="ml.exe"
         elif [ "$autodetect_compiler_PLATFORM_ARCH" = windows_x86_64 ]; then
             # The target machine is 64-bit
             autodetect_compiler_vsdev_dump_vars() {
                 autodetect_compiler_vsdev_dump_vars_helper -host_arch=x86 -arch=x64
             }
             OCAML_HOST_TRIPLET=x86_64-pc-windows
-            autodetect_compiler_vsdev_VALIDATECMD="ml64.exe"
-            autodetect_compiler_vsdev_MSVS_ML="ml64"
+            autodetect_compiler_vsdev_VALIDATE_ASM="ml64.exe"
         elif [ "$autodetect_compiler_PLATFORM_ARCH" = windows_arm32 ]; then
             # The target machine is 32-bit
             autodetect_compiler_vsdev_dump_vars() {
                 autodetect_compiler_vsdev_dump_vars_helper -host_arch=x86 -arch=arm
             }
             OCAML_HOST_TRIPLET=aarch64-pc-windows
-            autodetect_compiler_vsdev_VALIDATECMD="armasm64.exe"
-            autodetect_compiler_vsdev_MSVS_ML="armasm64"
+            autodetect_compiler_vsdev_VALIDATE_ASM="armasm64.exe"
         elif [ "$autodetect_compiler_PLATFORM_ARCH" = windows_arm64 ]; then
             # The target machine is 64-bit
             autodetect_compiler_vsdev_dump_vars() {
                 autodetect_compiler_vsdev_dump_vars_helper -host_arch=x86 -arch=arm64
             }
             OCAML_HOST_TRIPLET=armv7-pc-windows
-            autodetect_compiler_vsdev_VALIDATECMD="armasm.exe"
-            autodetect_compiler_vsdev_MSVS_ML="armasm"
+            autodetect_compiler_vsdev_VALIDATE_ASM="armasm.exe"
         else
             printf "%s\n" "FATAL: check_state autodetect_compiler BUILDHOST_ARCH=$BUILDHOST_ARCH autodetect_compiler_PLATFORM_ARCH=$autodetect_compiler_PLATFORM_ARCH" >&2
             exit 107
@@ -2323,8 +2319,7 @@ autodetect_compiler_vsdev() {
                 autodetect_compiler_vsdev_dump_vars_helper -arch=x64
             }
             OCAML_HOST_TRIPLET=x86_64-pc-windows
-            autodetect_compiler_vsdev_VALIDATECMD="ml64.exe"
-            autodetect_compiler_vsdev_MSVS_ML="ml64"
+            autodetect_compiler_vsdev_VALIDATE_ASM="ml64.exe"
         elif [ "$autodetect_compiler_PLATFORM_ARCH" = windows_x86 ]; then
             # The target machine is 32-bit
             autodetect_compiler_vsdev_dump_vars() {
@@ -2335,24 +2330,21 @@ autodetect_compiler_vsdev() {
                 fi
             }
             OCAML_HOST_TRIPLET=i686-pc-windows
-            autodetect_compiler_vsdev_VALIDATECMD="ml.exe"
-            autodetect_compiler_vsdev_MSVS_ML="ml"
+            autodetect_compiler_vsdev_VALIDATE_ASM="ml.exe"
         elif [ "$autodetect_compiler_PLATFORM_ARCH" = windows_arm64 ]; then
             # The target machine is 64-bit
             autodetect_compiler_vsdev_dump_vars() {
                 autodetect_compiler_vsdev_dump_vars_helper -host_arch=x64 -arch=arm64
             }
             OCAML_HOST_TRIPLET=aarch64-pc-windows
-            autodetect_compiler_vsdev_VALIDATECMD="armasm64.exe"
-            autodetect_compiler_vsdev_MSVS_ML="armasm64"
+            autodetect_compiler_vsdev_VALIDATE_ASM="armasm64.exe"
         elif [ "$autodetect_compiler_PLATFORM_ARCH" = windows_arm32 ]; then
             # The target machine is 32-bit
             autodetect_compiler_vsdev_dump_vars() {
                 autodetect_compiler_vsdev_dump_vars_helper -host_arch=x64 -arch=arm
             }
             OCAML_HOST_TRIPLET=armv7-pc-windows
-            autodetect_compiler_vsdev_VALIDATECMD="armasm.exe"
-            autodetect_compiler_vsdev_MSVS_ML="armasm"
+            autodetect_compiler_vsdev_VALIDATE_ASM="armasm.exe"
         else
             printf "%s\n" "FATAL: check_state autodetect_compiler BUILDHOST_ARCH=$BUILDHOST_ARCH autodetect_compiler_PLATFORM_ARCH=$autodetect_compiler_PLATFORM_ARCH" >&2
             exit 107
@@ -2445,14 +2437,17 @@ autodetect_compiler_vsdev() {
     autodetect_compiler_TGTARCH=$("$DKMLSYS_AWK" '
         BEGIN{FS="="} $1 == "VSCMD_ARG_TGT_ARCH" {name=$1; value=$0; sub(/^[^=]*=/,"",value);                print value}
         ' "$autodetect_compiler_TEMPDIR"/vcvars.txt)
-    if ! PATH="$autodetect_compiler_COMPILER_PATH_UNIX" "$autodetect_compiler_vsdev_VALIDATECMD" -help >/dev/null 2>/dev/null; then
-        echo "FATAL: The Visual Studio installation \"$VSDEV_HOME_BUILDHOST\" did not place '$autodetect_compiler_vsdev_VALIDATECMD' in its PATH." >&2
+    if ! PATH="$autodetect_compiler_COMPILER_PATH_UNIX" "$autodetect_compiler_vsdev_VALIDATE_ASM" -help >/dev/null 2>/dev/null; then
+        echo "FATAL: The Visual Studio installation \"$VSDEV_HOME_BUILDHOST\" did not place '$autodetect_compiler_vsdev_VALIDATE_ASM' in its PATH." >&2
         echo "       It should be present for the target ABI $autodetect_compiler_PLATFORM_ARCH ($autodetect_compiler_TGTARCH) on a build host $BUILDHOST_ARCH." >&2
         echo "  Fix? Run the Visual Studio Installer and then:" >&2
         echo "       1. Make sure you have the MSVC v$VSDEV_VCVARSVER $autodetect_compiler_TGTARCH Build Tools component." >&2
         echo "       2. Also make sure you have the Windows SDK $VSDEV_WINSDKVER component." >&2
         exit 107
     fi
+
+    # and set the assembler to the full path
+    autodetect_compiler_vsdev_MSVS_ML=$(PATH="$autodetect_compiler_COMPILER_PATH_UNIX" command -v "$autodetect_compiler_vsdev_VALIDATE_ASM")
 
     # SIXTH, set autodetect_compiler_COMPILER_UNIQ_PATH so that it is only the _unique_ entries
     # (the set {autodetect_compiler_COMPILER_UNIQ_PATH} - {DKML_SYSTEM_PATH}) are used. But maintain the order

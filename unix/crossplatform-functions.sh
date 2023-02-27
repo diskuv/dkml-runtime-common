@@ -1620,6 +1620,9 @@ autodetect_compiler() {
     autodetect_compiler_MSVS_LIB=
     autodetect_compiler_MSVS_PATH=
 
+    # Internal variables
+    autodetect_compiler_PATH_PREFIX=
+
     if [ "${DKML_BUILD_TRACE:-OFF}" = ON ] && [ "${DKML_BUILD_TRACE_LEVEL:-0}" -ge 2 ] ; then
         printf '@+ autodetect_compiler env\n' >&2
         "$DKMLSYS_ENV" | "$DKMLSYS_SED" 's/^/@env+| /' | "$DKMLSYS_AWK" '{print}' >&2
@@ -1790,6 +1793,9 @@ autodetect_compiler_write_output() {
             printf ")"
         elif [ "$autodetect_compiler_OUTPUTMODE" = LAUNCHER ]; then
             printf "%s\n" "#!$DKML_POSIX_SHELL"
+            if [ -n "${autodetect_compiler_PATH_PREFIX:-}" ]; then
+                printf "export PATH='%s':\"\$PATH\"\n" "$autodetect_compiler_PATH_PREFIX"
+            fi
             printf "%s\n" "exec $DKMLSYS_ENV \\"
 
             # shellcheck disable=SC2317
@@ -2099,6 +2105,7 @@ autodetect_compiler_cmake() {
     # == Windows ==
 
     if [ "$DKML_COMPILE_CM_CMAKE_SYSTEM_NAME" = "Windows" ] && cmake_flag_on "${DKML_COMPILE_CM_MSVC:-}"; then
+        # OCAML_HOST_TRIPLET
         case "$autodetect_compiler_PLATFORM_ARCH,${DKML_COMPILE_CM_CMAKE_SIZEOF_VOID_P:-}" in
             windows_x86_64,*)   OCAML_HOST_TRIPLET=x86_64-pc-windows ;;
             windows_x86,*)      OCAML_HOST_TRIPLET=i686-pc-windows ;;
@@ -2108,6 +2115,16 @@ autodetect_compiler_cmake() {
             *,4)                OCAML_HOST_TRIPLET=i686-pc-windows ;;
             *)                  OCAML_HOST_TRIPLET=i686-pc-windows ;;
         esac
+
+        # autodetect_compiler_PATH_PREFIX.
+        #  link.exe needs to be present for flexlink.exe to compile programs
+        if [ -n "${DKML_COMPILE_CM_CMAKE_LINKER:-}" ]; then
+            autodetect_compiler_cmake_LINKER_DIR=$(dirname "$DKML_COMPILE_CM_CMAKE_LINKER")
+            if [ -x /usr/bin/cygpath ]; then
+                autodetect_compiler_cmake_LINKER_DIR=$(/usr/bin/cygpath -au "$autodetect_compiler_cmake_LINKER_DIR")
+            fi
+            autodetect_compiler_PATH_PREFIX="${autodetect_compiler_PATH_PREFIX:+$autodetect_compiler_PATH_PREFIX:}$autodetect_compiler_cmake_LINKER_DIR"
+        fi
     fi
 
     # Set _CMAKE_C_FLAGS_FOR_CONFIG and _CMAKE_ASM_FLAGS_FOR_CONFIG to

@@ -1257,7 +1257,18 @@ create_system_launcher() {
         create_system_launcher_SYSTEMPATHUNIX="$DKML_SYSTEM_PATH"
     fi
 
-    printf "#!%s\nexec %s PATH='%s' %s\n" "$DKML_POSIX_SHELL" "$DKMLSYS_ENV" "$create_system_launcher_SYSTEMPATHUNIX" '"$@"' > "$create_system_launcher_OUTPUTFILE".tmp
+    # With MSYS2
+    # * it is quite possible to have Path and PATH in the same environment. Opam seems to use camel case, which
+    #   is probably fine in Cygwin.
+    if is_msys2_msys_build_machine; then
+        create_system_launcher_ENVARGS=" --unset=PATH --unset=Path"
+    else
+        create_system_launcher_ENVARGS=
+    fi
+
+    printf "#!%s\nexec %s%s PATH='%s' %s\n" "$DKML_POSIX_SHELL" "$DKMLSYS_ENV" \
+        "$create_system_launcher_ENVARGS" \
+        "$create_system_launcher_SYSTEMPATHUNIX" '"$@"' > "$create_system_launcher_OUTPUTFILE".tmp
     "$DKMLSYS_CHMOD" +x "$create_system_launcher_OUTPUTFILE".tmp
     "$DKMLSYS_MV" "$create_system_launcher_OUTPUTFILE".tmp "$create_system_launcher_OUTPUTFILE"
 }

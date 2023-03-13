@@ -1374,8 +1374,6 @@ cmake_flag_off() {
 #     - env:DKML_COMPILE_CM_CMAKE_ASM_COMPILER_TARGET
 #     - env:DKML_COMPILE_CM_CMAKE_ASM_COMPILE_OBJECT
 #     - env:DKML_COMPILE_CM_CMAKE_ASM_COMPILE_OPTIONS_TARGET
-#     - env:DKML_COMPILE_CM_CMAKE_ASM_MASM_COMPILER
-#     - env:DKML_COMPILE_CM_CMAKE_ASM_NASM_COMPILER
 #     - env:DKML_COMPILE_CM_CMAKE_ASM_FLAGS - All uppercased values of $<CONFIG> should be defined as well. The
 #       _DEBUG/_RELEASE/_RELEASECOMPATFUZZ/_RELEASECOMPATPERF variables below are the standard $<CONFIG> that
 #       come with DKSDK. Other $<CONFIG> may be defined as well on a per-project basis.
@@ -1384,6 +1382,11 @@ cmake_flag_off() {
 #     - env:DKML_COMPILE_CM_CMAKE_ASM_FLAGS_RELEASECOMPATFUZZ
 #     - env:DKML_COMPILE_CM_CMAKE_ASM_FLAGS_RELEASECOMPATPERF
 #     - env:DKML_COMPILE_CM_CMAKE_ASM_OSX_DEPLOYMENT_TARGET_FLAG
+#     - env:DKML_COMPILE_CM_CMAKE_ASM_MASM_COMPILER
+#     - env:DKML_COMPILE_CM_CMAKE_ASM_NASM_COMPILER
+#     - env:DKML_COMPILE_CM_CMAKE_ASM_ATT_COMPILER - The CMake variable CMAKE_ASM-ATT_COMPILER
+#     - env:DKML_COMPILE_CM_CMAKE_ASM_ATT_COMPILE_OBJECT - The CMake variable CMAKE_ASM-ATT_COMPILE_OBJECT
+#     - env:DKML_COMPILE_CM_CMAKE_ASM_ATT_FLAGS - The CMake variable CMAKE_ASM-ATT_FLAGS
 #     - env:DKML_COMPILE_CM_CMAKE_C_COMPILER
 #     - env:DKML_COMPILE_CM_CMAKE_C_COMPILER_ID
 #     - env:DKML_COMPILE_CM_CMAKE_C_COMPILE_OPTIONS_PIC
@@ -1678,17 +1681,29 @@ autodetect_compiler_escape_envarg() {
     "$DKMLSYS_CAT" "$@" | escape_stdin_for_single_quote
 }
 
-# Sets _CMAKE_(C|ASM|CXX)_FLAGS_FOR_CONFIG environment variables to the value
+# Sets _CMAKE_ASM_FLAGS and _CMAKE_(C|ASM|CXX)_FLAGS_FOR_CONFIG environment variables to the value
 # of config-specific c_flags and asm_flags variable like
-# `DKML_COMPILE_CM_CMAKE_C_FLAGS_DEBUG` and `DKML_COMPILE_CM_CMAKE_ASM_FLAGS_DEBUG` when
+# `DKML_COMPILE_CM_CMAKE_C_FLAGS_DEBUG` and `DKML_COMPILE_CM_CMAKE_ASM_ATT_FLAGS_DEBUG` when
 # `DKML_COMPILE_CM_CONFIG` is `Debug`.
+# The specific ASM variant defaults to ASM, but can be ASM_MASM, ASM_NASM or ASM_ATT.
 autodetect_compiler_cmake_get_config_flags() {
+    # ASM, ASM_MASM, ASM_NASM or ASM-ATT?
+    autodetect_compiler_cmake_get_config_flags_ASM=ASM
+    if [ -n "${DKML_COMPILE_CM_CMAKE_ASM_MASM_COMPILER:-}" ]; then
+        autodetect_compiler_cmake_get_config_flags_ASM=ASM_MASM
+    elif [ -n "${DKML_COMPILE_CM_CMAKE_ASM_NASM_COMPILER:-}" ]; then
+        autodetect_compiler_cmake_get_config_flags_ASM=ASM_NASM
+    elif [ -n "${DKML_COMPILE_CM_CMAKE_ASM_ATT_COMPILER:-}" ]; then
+        autodetect_compiler_cmake_get_config_flags_ASM=ASM_ATT
+    fi
+
     # example command: _CMAKE_C_FLAGS_FOR_CONFIG="$DKML_COMPILE_CM_CMAKE_C_FLAGS_DEBUG"
     autodetect_compiler_cmake_get_config_flags_CONFIGUPPER=$(printf "%s" "$DKML_COMPILE_CM_CONFIG" | $DKMLSYS_TR '[:lower:]' '[:upper:]')
     {
       printf "_CMAKE_C_FLAGS_FOR_CONFIG=\"\${DKML_COMPILE_CM_CMAKE_C_FLAGS_%s:-}\"\n" "$autodetect_compiler_cmake_get_config_flags_CONFIGUPPER"
       printf "_CMAKE_CXX_FLAGS_FOR_CONFIG=\"\${DKML_COMPILE_CM_CMAKE_CXX_FLAGS_%s:-}\"\n" "$autodetect_compiler_cmake_get_config_flags_CONFIGUPPER"
-      printf "_CMAKE_ASM_FLAGS_FOR_CONFIG=\"\${DKML_COMPILE_CM_CMAKE_ASM_FLAGS_%s:-}\"\n" "$autodetect_compiler_cmake_get_config_flags_CONFIGUPPER"
+      printf "_CMAKE_ASM_FLAGS=\"\${DKML_COMPILE_CM_CMAKE_%s_FLAGS:-}\"\n" "$autodetect_compiler_cmake_get_config_flags_ASM"
+      printf "_CMAKE_ASM_FLAGS_FOR_CONFIG=\"\${DKML_COMPILE_CM_CMAKE_%s_FLAGS_%s:-}\"\n" "$autodetect_compiler_cmake_get_config_flags_ASM" "$autodetect_compiler_cmake_get_config_flags_CONFIGUPPER"
     } > "$autodetect_compiler_OUTPUTFILE.flags.source"
     # shellcheck disable=SC1090
     . "$autodetect_compiler_OUTPUTFILE.flags.source"
@@ -2038,6 +2053,8 @@ autodetect_compiler_cmake() {
         autodetect_compiler_cmake_THE_AS=$DKML_COMPILE_CM_CMAKE_ASM_NASM_COMPILER
     elif [ -n "${DKML_COMPILE_CM_CMAKE_ASM_MASM_COMPILER:-}" ]; then
         autodetect_compiler_cmake_THE_AS=$DKML_COMPILE_CM_CMAKE_ASM_MASM_COMPILER
+    elif [ -n "${DKML_COMPILE_CM_CMAKE_ASM_ATT_COMPILER:-}" ]; then
+        autodetect_compiler_cmake_THE_AS=$DKML_COMPILE_CM_CMAKE_ASM_ATT_COMPILER
     fi
 
     # Platform-specific requirements
@@ -2127,7 +2144,7 @@ autodetect_compiler_cmake() {
         fi
     fi
 
-    # Set _CMAKE_C_FLAGS_FOR_CONFIG and _CMAKE_ASM_FLAGS_FOR_CONFIG to
+    # Set _CMAKE_C_FLAGS_FOR_CONFIG and _CMAKE_ASM_FLAGS_FOR_CONFIG and _CMAKE_ASM_FLAGS to
     # $DKML_COMPILE_CM_CMAKE_C_FLAGS_DEBUG if DKML_COMPILE_CM_CONFIG=Debug, etc.
     autodetect_compiler_cmake_get_config_flags
 
@@ -2137,7 +2154,7 @@ autodetect_compiler_cmake() {
     autodetect_compiler_CFLAGS="$autodetect_compiler_cmake_Specific_CFLAGS ${DKML_COMPILE_CM_CMAKE_C_FLAGS:-} $_CMAKE_C_FLAGS_FOR_CONFIG"
     autodetect_compiler_CXXFLAGS="$autodetect_compiler_cmake_Specific_CXXFLAGS ${DKML_COMPILE_CM_CMAKE_CXX_FLAGS:-} $_CMAKE_CXX_FLAGS_FOR_CONFIG"
     autodetect_compiler_AS="$autodetect_compiler_cmake_THE_AS"
-    autodetect_compiler_ASFLAGS="$autodetect_compiler_cmake_Specific_ASFLAGS ${DKML_COMPILE_CM_CMAKE_ASM_FLAGS:-} $_CMAKE_ASM_FLAGS_FOR_CONFIG"
+    autodetect_compiler_ASFLAGS="$autodetect_compiler_cmake_Specific_ASFLAGS $_CMAKE_ASM_FLAGS $_CMAKE_ASM_FLAGS_FOR_CONFIG"
     autodetect_compiler_LD="${DKML_COMPILE_CM_CMAKE_LINKER:-}"
     autodetect_compiler_LDFLAGS="$autodetect_compiler_cmake_Specific_LDFLAGS"
     autodetect_compiler_LDLIBS="${DKML_COMPILE_CM_CMAKE_C_STANDARD_LIBRARIES:-}"
@@ -2152,8 +2169,11 @@ autodetect_compiler_cmake() {
             if [ -x /usr/bin/cygpath ]; then
                 autodetect_compiler_add_parent_to_msvs_path_VAL=$(/usr/bin/cygpath -au "$autodetect_compiler_add_parent_to_msvs_path_VAL")
             fi
-            autodetect_compiler_add_parent_to_msvs_path_VAL=$(PATH=/usr/bin:/bin dirname "$autodetect_compiler_add_parent_to_msvs_path_VAL")
-            autodetect_compiler_MSVS_PATH="$autodetect_compiler_add_parent_to_msvs_path_VAL${autodetect_compiler_MSVS_PATH:+:$autodetect_compiler_MSVS_PATH}"
+            case "$autodetect_compiler_add_parent_to_msvs_path_VAL" in
+                /*) # absolute Unix path
+                    autodetect_compiler_add_parent_to_msvs_path_VAL=$(PATH=/usr/bin:/bin dirname "$autodetect_compiler_add_parent_to_msvs_path_VAL")
+                    autodetect_compiler_MSVS_PATH="$autodetect_compiler_add_parent_to_msvs_path_VAL${autodetect_compiler_MSVS_PATH:+:$autodetect_compiler_MSVS_PATH}"
+            esac
         fi
     }
     autodetect_compiler_add_parent_to_msvs_path "${DKML_COMPILE_CM_CMAKE_C_COMPILER:-}"

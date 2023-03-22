@@ -1373,6 +1373,8 @@ cmake_flag_off() {
 #     - env:DKML_COMPILE_CM_CMAKE_ASM_COMPILER_ID
 #     - env:DKML_COMPILE_CM_CMAKE_ASM_COMPILER_TARGET
 #     - env:DKML_COMPILE_CM_CMAKE_ASM_COMPILE_OBJECT
+#     - env:DKML_COMPILE_CM_CMAKE_ASM_COMPILE_OPTIONS_PIC
+#     - env:DKML_COMPILE_CM_CMAKE_ASM_COMPILE_OPTIONS_PIE
 #     - env:DKML_COMPILE_CM_CMAKE_ASM_COMPILE_OPTIONS_TARGET
 #     - env:DKML_COMPILE_CM_CMAKE_ASM_FLAGS - All uppercased values of $<CONFIG> should be defined as well. The
 #       _DEBUG/_RELEASE/_RELEASECOMPATFUZZ/_RELEASECOMPATPERF variables below are the standard $<CONFIG> that
@@ -2065,20 +2067,34 @@ autodetect_compiler_cmake() {
     autodetect_compiler_cmake_Specific_CXXFLAGS=
     autodetect_compiler_cmake_Specific_LDFLAGS=
 
-    # == Android ==
+    # == Linux including Android ==
 
-    if [ "$DKML_COMPILE_CM_CMAKE_SYSTEM_NAME" = "Android" ]; then
+    if [ "$DKML_COMPILE_CM_CMAKE_SYSTEM_NAME" = "Linux" ] || [ "$DKML_COMPILE_CM_CMAKE_SYSTEM_NAME" = "Android" ]; then
+        # [Android]
+        #
         # https://developer.android.com/ndk/guides/standalone_toolchain#building_open_source_projects_using_standalone_toolchains
         # > # Tell configure what flags Android requires.
         # > export CFLAGS="-fPIE -fPIC"
         # > export LDFLAGS="-pie"
         # Since they may be CMake string arrays (ex. `-fPIE;-pie`) we replace all semicolons with spaces.
+        #
+        # [Linux]
+        #
+        # For Linux, the situation for PIE/PIC depends on the recency of the Linux distribution. Newer Linux distros enable PIE
+        # by default, while older ones (like the dockcross ones used by DkSDK/setup-dkml for portability) do not enable PIE.
+        # See https://stackoverflow.com/questions/43367427/32-bit-absolute-addresses-no-longer-allowed-in-x86-64-linux
+        #
+        #   Either way, add PIE like Android recommends.
         autodetect_compiler_cmake_Specific_CFLAGS=$(printf "%s\n" "$autodetect_compiler_cmake_Specific_CFLAGS ${DKML_COMPILE_CM_CMAKE_C_COMPILE_OPTIONS_PIE:-} ${DKML_COMPILE_CM_CMAKE_C_COMPILE_OPTIONS_PIC:-}" | $DKMLSYS_SED 's/;/ /g')
         autodetect_compiler_cmake_Specific_CXXFLAGS=$(printf "%s\n" "$autodetect_compiler_cmake_Specific_CXXFLAGS ${DKML_COMPILE_CM_CMAKE_CXX_COMPILE_OPTIONS_PIE:-} ${DKML_COMPILE_CM_CMAKE_CXX_COMPILE_OPTIONS_PIC:-}" | $DKMLSYS_SED 's/;/ /g')
         #     For LDFLAGS since CMake does not have a linker pie options variable (ie. CMAKE_LINKER_OPTIONS_PIE) we hardcode it;
         #     we intentionally do not use CMAKE_C_LINK_OPTIONS_PIE since that is for the C compiler (clang) not the linker (ld.lld).
         autodetect_compiler_cmake_Specific_LDFLAGS="--pie $autodetect_compiler_cmake_Specific_LDFLAGS"
+    fi
 
+    # == Android ==
+
+    if [ "$DKML_COMPILE_CM_CMAKE_SYSTEM_NAME" = "Android" ]; then
         # https://developer.android.com/ndk/guides/standalone_toolchain#abi_compatibility
         # > By default, an ARM Clang standalone toolchain will target the armeabi-v7a ABI.
         # > To use NEON instructions, you must use the -mfpu compiler flag: -mfpu=neon.

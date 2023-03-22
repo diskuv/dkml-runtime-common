@@ -2084,12 +2084,21 @@ autodetect_compiler_cmake() {
         # by default, while older ones (like the dockcross ones used by DkSDK/setup-dkml for portability) do not enable PIE.
         # See https://stackoverflow.com/questions/43367427/32-bit-absolute-addresses-no-longer-allowed-in-x86-64-linux
         #
-        #   Either way, add PIE like Android recommends.
-        autodetect_compiler_cmake_Specific_CFLAGS=$(printf "%s\n" "$autodetect_compiler_cmake_Specific_CFLAGS ${DKML_COMPILE_CM_CMAKE_C_COMPILE_OPTIONS_PIE:-} ${DKML_COMPILE_CM_CMAKE_C_COMPILE_OPTIONS_PIC:-}" | $DKMLSYS_SED 's/;/ /g')
-        autodetect_compiler_cmake_Specific_CXXFLAGS=$(printf "%s\n" "$autodetect_compiler_cmake_Specific_CXXFLAGS ${DKML_COMPILE_CM_CMAKE_CXX_COMPILE_OPTIONS_PIE:-} ${DKML_COMPILE_CM_CMAKE_CXX_COMPILE_OPTIONS_PIC:-}" | $DKMLSYS_SED 's/;/ /g')
-        #     For LDFLAGS since CMake does not have a linker pie options variable (ie. CMAKE_LINKER_OPTIONS_PIE) we hardcode it;
-        #     we intentionally do not use CMAKE_C_LINK_OPTIONS_PIE since that is for the C compiler (clang) not the linker (ld.lld).
-        autodetect_compiler_cmake_Specific_LDFLAGS="--pie $autodetect_compiler_cmake_Specific_LDFLAGS"
+        # Either way, add PIC like Android recommends. However PIE is more complicated. Take base.v0.15.1/src/int_math_stubs.c
+        # for example. When `gcc -fPIC -fPIE` (from a dune build), and then inspect with `readelf -r int_math_stubs.o`, we see
+        # a non-PIC relocation R_X86_64_PC32. However just -fPIC does the right relocations. So we just do -fPIE on Linux.
+        if [ "$DKML_COMPILE_CM_CMAKE_SYSTEM_NAME" = "Android" ]; then
+            autodetect_compiler_cmake_PIC_PIE="${DKML_COMPILE_CM_CMAKE_C_COMPILE_OPTIONS_PIE:-} ${DKML_COMPILE_CM_CMAKE_C_COMPILE_OPTIONS_PIC:-}"
+        else
+            autodetect_compiler_cmake_PIC_PIE="${DKML_COMPILE_CM_CMAKE_C_COMPILE_OPTIONS_PIC:-}"
+        fi
+        autodetect_compiler_cmake_Specific_CFLAGS=$(printf "%s\n" "$autodetect_compiler_cmake_Specific_CFLAGS${autodetect_compiler_cmake_PIC_PIE:+ $autodetect_compiler_cmake_PIC_PIE}" | $DKMLSYS_SED 's/;/ /g')
+        autodetect_compiler_cmake_Specific_CXXFLAGS=$(printf "%s\n" "$autodetect_compiler_cmake_Specific_CXXFLAGS${autodetect_compiler_cmake_PIC_PIE:+ $autodetect_compiler_cmake_PIC_PIE}" | $DKMLSYS_SED 's/;/ /g')
+        if [ "$DKML_COMPILE_CM_CMAKE_SYSTEM_NAME" = "Android" ]; then
+            #     For LDFLAGS since CMake does not have a linker pie options variable (ie. CMAKE_LINKER_OPTIONS_PIE) we hardcode it;
+            #     we intentionally do not use CMAKE_C_LINK_OPTIONS_PIE since that is for the C compiler (clang) not the linker (ld.lld).
+            autodetect_compiler_cmake_Specific_LDFLAGS="--pie${autodetect_compiler_cmake_Specific_LDFLAGS:+ $autodetect_compiler_cmake_Specific_LDFLAGS}"
+        fi
     fi
 
     # == Android ==

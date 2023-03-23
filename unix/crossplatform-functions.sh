@@ -2078,6 +2078,8 @@ autodetect_compiler_cmake() {
         # > export LDFLAGS="-pie"
         # Since they may be CMake string arrays (ex. `-fPIE;-pie`) we replace all semicolons with spaces.
         #
+        # 2023-03-22 update: -fPIE is causing the same issues as Linux below when combined with -fPIC.
+        #
         # [Linux]
         #
         # For Linux, the situation for PIE/PIC depends on the recency of the Linux distribution. Newer Linux distros enable PIE
@@ -2088,7 +2090,8 @@ autodetect_compiler_cmake() {
         # for example. When `gcc -fPIC -fPIE` (from a dune build), and then inspect with `readelf -r int_math_stubs.o`, we see
         # a non-PIC relocation R_X86_64_PC32. However just -fPIC does the right relocations. So we just do -fPIE on Linux.
         if [ "$DKML_COMPILE_CM_CMAKE_SYSTEM_NAME" = "Android" ]; then
-            autodetect_compiler_cmake_PIC_PIE="${DKML_COMPILE_CM_CMAKE_C_COMPILE_OPTIONS_PIE:-} ${DKML_COMPILE_CM_CMAKE_C_COMPILE_OPTIONS_PIC:-}"
+            #autodetect_compiler_cmake_PIC_PIE="${DKML_COMPILE_CM_CMAKE_C_COMPILE_OPTIONS_PIE:-} ${DKML_COMPILE_CM_CMAKE_C_COMPILE_OPTIONS_PIC:-}"
+            autodetect_compiler_cmake_PIC_PIE="${DKML_COMPILE_CM_CMAKE_C_COMPILE_OPTIONS_PIC:-}"
         else
             autodetect_compiler_cmake_PIC_PIE="${DKML_COMPILE_CM_CMAKE_C_COMPILE_OPTIONS_PIC:-}"
         fi

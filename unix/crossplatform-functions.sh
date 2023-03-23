@@ -1266,7 +1266,7 @@ create_system_launcher() {
         create_system_launcher_ENVARGS=
     fi
 
-    printf "#!%s\nexec %s%s PATH='%s' %s\n" "$DKML_POSIX_SHELL" "$DKMLSYS_ENV" \
+    printf "#!%s\nset -euf\nexec %s%s PATH='%s' %s\n" "$DKML_POSIX_SHELL" "$DKMLSYS_ENV" \
         "$create_system_launcher_ENVARGS" \
         "$create_system_launcher_SYSTEMPATHUNIX" '"$@"' > "$create_system_launcher_OUTPUTFILE".tmp
     "$DKMLSYS_CHMOD" +x "$create_system_launcher_OUTPUTFILE".tmp
@@ -1820,6 +1820,7 @@ autodetect_compiler_write_output() {
             printf ")"
         elif [ "$autodetect_compiler_OUTPUTMODE" = LAUNCHER ]; then
             printf "%s\n" "#!$DKML_POSIX_SHELL"
+            printf "set -euf\n"
             if [ -n "${autodetect_compiler_PATH_PREFIX:-}" ]; then
                 printf "export PATH='%s':\"\$PATH\"\n" "$autodetect_compiler_PATH_PREFIX"
             fi

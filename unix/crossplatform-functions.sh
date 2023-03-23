@@ -1380,6 +1380,8 @@ cmake_flag_notfound() {
 #     - env:DKML_COMPILE_CM_CMAKE_ASM_COMPILER
 #     - env:DKML_COMPILE_CM_CMAKE_ASM_COMPILER_ID
 #     - env:DKML_COMPILE_CM_CMAKE_ASM_COMPILER_TARGET
+#     - env:DKML_COMPILE_CM_CMAKE_ASM_COMPILER_AR - Typically set by Android's CMake toolchain to different but correct value compared to CMAKE_AR
+#     - env:DKML_COMPILE_CM_CMAKE_ASM_COMPILER_RANLIB - Typically set by Android's CMake toolchain to different but correct value compared to CMAKE_RANLIB
 #     - env:DKML_COMPILE_CM_CMAKE_ASM_COMPILE_OBJECT
 #     - env:DKML_COMPILE_CM_CMAKE_ASM_COMPILE_OPTIONS_PIC
 #     - env:DKML_COMPILE_CM_CMAKE_ASM_COMPILE_OPTIONS_PIE

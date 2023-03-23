@@ -1299,6 +1299,14 @@ cmake_flag_off() {
     fi
 }
 
+cmake_flag_notfound() {
+    # Definition at https://cmake.org/cmake/help/latest/command/if.html#basic-expressions
+    case "$1" in
+        *-NOTFOUND) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 # Detects a compiler like Visual Studio and sets its variables.
 #
 # autodetect_compiler [--sexp] OUTPUT_SCRIPT_OR_SEXP [EXTRA_PREFIX]

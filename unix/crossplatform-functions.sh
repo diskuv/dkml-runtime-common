@@ -516,7 +516,7 @@ autodetect_system_binaries() {
         fi
     fi
     export DKMLSYS_MV DKMLSYS_CHMOD DKMLSYS_UNAME DKMLSYS_ENV DKMLSYS_AWK DKMLSYS_SED DKMLSYS_COMM DKMLSYS_INSTALL
-    export DKMLSYS_RM DKMLSYS_SORT DKMLSYS_CAT DKMLSYS_STAT DKMLSYS_GREP DKMLSYS_CURL DKMLSYS_TR
+    export DKMLSYS_RM DKMLSYS_SORT DKMLSYS_CAT DKMLSYS_STAT DKMLSYS_GREP DKMLSYS_CURL DKMLSYS_WGET DKMLSYS_TR
 }
 
 # Is a Windows build machine if we are in a MSYS2 or Cygwin environment.
@@ -993,15 +993,13 @@ install_reproducible_script_with_args() {
     "$DKMLSYS_CHMOD" 755 "$install_reproducible_script_with_args_BOOTSTRAPDIR"/"$install_reproducible_script_with_args_RECREATEFILE"
 }
 
-# Tries to find the ARCH (defined in TOPDIR/Makefile corresponding to the build machine).
-# ARCH is also called the PLATFORM.
-# For now only tested in Linux/Windows x86/x86_64 and Apple x86_64/arm64.
+# Tries to find the host ABI.
 #
-# This function uses `uname` probing which sometimes is often inaccurate
-# during cross-compilation.
+# Beware: This function uses `uname` probing which is inaccurate during
+# cross-compilation.
 #
 # Outputs:
-# - env:BUILDHOST_ARCH will contain the correct ARCH
+# - env:BUILDHOST_ARCH will contain the host ABI.
 autodetect_buildhost_arch() {
     # Set DKMLSYS_*
     autodetect_system_binaries

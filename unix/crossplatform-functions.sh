@@ -395,7 +395,8 @@ autodetect_system_path_with_git_before_usr_bin() {
 # - env:DKMLSYS_CAT - Location of `cat`
 # - env:DKMLSYS_STAT - Location of `stat`
 # - env:DKMLSYS_GREP - Location of `grep`
-# - env:DKMLSYS_CURL - Location of `curl`
+# - env:DKMLSYS_CURL - Location of `curl` (empty if not found)
+# - env:DKMLSYS_WGET - Location of `wget` (empty if not found)
 # - env:DKMLSYS_TR - Location of `tr`
 autodetect_system_binaries() {
     if [ -z "${DKMLSYS_MV:-}" ]; then
@@ -492,8 +493,19 @@ autodetect_system_binaries() {
     if [ -z "${DKMLSYS_CURL:-}" ]; then
         if [ -x /usr/bin/curl ]; then
             DKMLSYS_CURL=/usr/bin/curl
-        else
+        elif [ -x /bin/curl ]; then
             DKMLSYS_CURL=/bin/curl
+        else
+            DKMLSYS_CURL=
+        fi
+    fi
+    if [ -z "${DKMLSYS_WGET:-}" ]; then
+        if [ -x /usr/bin/wget ]; then
+            DKMLSYS_WGET=/usr/bin/wget
+        elif [ -x /bin/wget ]; then
+            DKMLSYS_WGET=/bin/wget
+        else
+            DKMLSYS_WGET=
         fi
     fi
     if [ -z "${DKMLSYS_TR:-}" ]; then
@@ -2885,9 +2897,23 @@ downloadfile() {
         fi
     fi
     if [ "${CI:-}" = true ]; then
-        log_trace "$DKMLSYS_CURL" -L -s "$downloadfile_URL" -o "$downloadfile_FILE".tmp
+        if [ -n "$DKMLSYS_CURL" ]; then
+            log_trace "$DKMLSYS_CURL" -L -s "$downloadfile_URL" -o "$downloadfile_FILE".tmp
+        elif [ -n "$DKMLSYS_WGET" ]; then
+            log_trace "$DKMLSYS_WGET" -q -O "$downloadfile_FILE".tmp "$downloadfile_URL"
+        else
+            echo "No curl or wget available on the system paths" >&2
+            exit 107
+        fi
     else
-        log_trace "$DKMLSYS_CURL" -L "$downloadfile_URL" -o "$downloadfile_FILE".tmp
+        if [ -n "$DKMLSYS_CURL" ]; then
+            log_trace "$DKMLSYS_CURL" -L "$downloadfile_URL" -o "$downloadfile_FILE".tmp
+        elif [ -n "$DKMLSYS_WGET" ]; then
+            log_trace "$DKMLSYS_WGET" -O "$downloadfile_FILE".tmp "$downloadfile_URL"
+        else
+            echo "No curl or wget available on the system paths" >&2
+            exit 107
+        fi
     fi
     if ! sha256check "$downloadfile_FILE".tmp "$downloadfile_SUM"; then
         printf "%s\n" "FATAL: Encountered a corrupted or compromised download from $downloadfile_URL" >&2

@@ -2850,9 +2850,9 @@ sha256check() {
     sha256check_SUM="$1"
     shift
     if [ -x /usr/bin/shasum ]; then
-        printf "%s  %s" "$sha256check_SUM" "$sha256check_FILE" | /usr/bin/shasum -a 256 -c
+        printf "%s  %s" "$sha256check_SUM" "$sha256check_FILE" | /usr/bin/shasum -a 256 -c >&2
     elif [ -x /usr/bin/sha256sum ]; then
-        printf "%s  %s" "$sha256check_SUM" "$sha256check_FILE" | /usr/bin/sha256sum -c
+        printf "%s  %s" "$sha256check_SUM" "$sha256check_FILE" | /usr/bin/sha256sum -c >&2
     else
         printf "FATAL: %s\n" "No sha256 checksum utility found" >&2
         exit 107

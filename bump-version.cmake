@@ -1,14 +1,14 @@
 # Test with:
-# cmake --log-context -D DRYRUN=1 -D CMAKE_MESSAGE_CONTEXT=dkml-runtime-common -D "regex_DKML_VERSION_SEMVER=1[.]2[.]1-[0-9]+" -D "regex_DKML_VERSION_OPAMVER=1[.]2[.]1[~]prerel[0-9]+" -D DKML_VERSION_SEMVER_NEW=1.2.1-3 -D DKML_VERSION_OPAMVER_NEW=1.2.1~prerel3 -D GIT_EXECUTABLE=git -D DKML_RELEASE_OCAML_VERSION=4.14.0 -D DKML_RELEASE_PARTICIPANT_MODULE=../../../pkg/bump/DkMLReleaseParticipant.cmake -P bump-version.cmake
+# cmake --log-context -D DRYRUN=1 -D CMAKE_MESSAGE_CONTEXT=dkml-runtime-common -D "regex_DKML_VERSION_SEMVER=1[.]2[.]1-[0-9]+" -D "regex_DKML_VERSION_OPAMVER=1[.]2[.]1[~]prerel[0-9]+" -D DKML_VERSION_SEMVER_NEW=1.2.1-3 -D DKML_VERSION_OPAMVER_NEW=1.2.1~prerel3 -D GIT_EXECUTABLE=git -D DKML_RELEASE_OCAML_VERSION=4.14.0 -D DKML_RELEASE_PARTICIPANT_MODULE=../../../pkg/bump/DkMLBumpVersionParticipant.cmake -P bump-version.cmake
 
 if(NOT DKML_RELEASE_PARTICIPANT_MODULE)
-    message(FATAL_ERROR "Missing -D DKML_RELEASE_PARTICIPANT_MODULE=.../DkMLReleaseParticipant.cmake")
+    message(FATAL_ERROR "Missing -D DKML_RELEASE_PARTICIPANT_MODULE=.../DkMLBumpVersionParticipant.cmake")
 endif()
 include(${DKML_RELEASE_PARTICIPANT_MODULE})
 
-DkMLReleaseParticipant_PlainReplace(template.dkmlroot)
-DkMLReleaseParticipant_PlainReplace(README.md)
-DkMLReleaseParticipant_MetaReplace(META)
-DkMLReleaseParticipant_OpamReplace(dkml-runtime-common.opam)
-DkMLReleaseParticipant_OpamReplace(dkml-runtime-common-native.opam)
-DkMLReleaseParticipant_GitAddAndCommit()
+DkMLBumpVersionParticipant_PlainReplace(template.dkmlroot)
+DkMLBumpVersionParticipant_PlainReplace(README.md)
+DkMLBumpVersionParticipant_MetaReplace(META)
+DkMLBumpVersionParticipant_OpamReplace(dkml-runtime-common.opam)
+DkMLBumpVersionParticipant_OpamReplace(dkml-runtime-common-native.opam)
+DkMLBumpVersionParticipant_GitAddAndCommit()

@@ -12,7 +12,7 @@ homepage: "https://github.com/diskuv/dkml-runtime-common"
 bug-reports: "https://github.com/diskuv/dkml-runtime-common/issues"
 dev-repo: "git+https://github.com/diskuv/dkml-runtime-common.git"
 depends: [
-  "dune"
+  "dune" {>= "2.9"}
 ]
 build: [
   ["dune" "build" "-p" name]

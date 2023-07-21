@@ -839,7 +839,7 @@ install_reproducible_system_packages() {
     elif is_arg_darwin_based_platform "$BUILDHOST_ARCH"; then
         # Use a Brewfile.lock.json as the package manifest.
         # However, when `brew` is not available (ex. Xcode runs CMake with a PATH that excludes homebrew) it is likely
-        # that no brew installed packages are available either. So if CMake succeeds then no brew commands were needed!
+        # that no brew installed packages are available either.
         if command -v brew >/dev/null; then
             # Brew exists and its installed packages can be used in the rest of the reproducible scripts.
             if [ -n "${DKML_REPRODUCIBLE_SYSTEM_BREWFILE:-}" ] && [ -e "${DKML_REPRODUCIBLE_SYSTEM_BREWFILE}" ]; then

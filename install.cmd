@@ -6,6 +6,9 @@ SETLOCAL ENABLEEXTENSIONS
 @ECHO ---------------------
 SET TARGETDIR=%1
 
+@REM Create macos/ subdirectory including any parent directories (extensions are enabled)
+MKDIR "%TARGETDIR%\macos"
+
 @REM Create unix/ subdirectory including any parent directories (extensions are enabled)
 MKDIR "%TARGETDIR%\unix"
 
@@ -16,6 +19,8 @@ MKDIR "%TARGETDIR%\all\emptytop"
 XCOPY /Y /H /I META                             "%TARGETDIR%"
 IF %ERRORLEVEL% NEQ 0 (Echo Error during XCOPY &Exit /b 1)
 XCOPY /Y /H /I template.dkmlroot                "%TARGETDIR%"
+IF %ERRORLEVEL% NEQ 0 (Echo Error during XCOPY &Exit /b 1)
+XCOPY /Y /H /I macos\brewbundle.sh              "%TARGETDIR%\macos"
 IF %ERRORLEVEL% NEQ 0 (Echo Error during XCOPY &Exit /b 1)
 XCOPY /Y /H /I unix\_common_tool.sh             "%TARGETDIR%\unix"
 IF %ERRORLEVEL% NEQ 0 (Echo Error during XCOPY &Exit /b 1)

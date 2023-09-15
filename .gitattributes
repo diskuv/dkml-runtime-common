@@ -22,6 +22,7 @@ opam text
 *.ml text eol=lf
 *.opam text eol=lf
 *.opam.template text eol=lf
+*.txt text eol=lf
 
 # Declare files that will always have CRLF line endings on checkout.
 *.sln text eol=crlf

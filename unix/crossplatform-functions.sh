@@ -2832,10 +2832,16 @@ sha256compute() {
         sha256compute_FILE=$(/usr/bin/cygpath -a "$sha256compute_FILE")
     fi
 
-    if [ -x /usr/bin/shasum ]; then
-        /usr/bin/shasum -a 256 "$sha256compute_FILE" | awk '{print $1}'
-    elif [ -x /usr/bin/sha256sum ]; then
-        /usr/bin/sha256sum "$sha256compute_FILE" | awk '{print $1}'
+    autodetect_system_binaries
+    if [ -x /usr/bin/shasum ]; then # macOS, OpenBSD
+        #   shellcheck disable=SC2016
+        /usr/bin/shasum -a 256 "$sha256compute_FILE" | "$DKMLSYS_AWK" '{print $1}'
+    elif [ -x /usr/bin/sha256sum ]; then # Linux, MSYS2
+        #   shellcheck disable=SC2016
+        /usr/bin/sha256sum "$sha256compute_FILE" | "$DKMLSYS_AWK" '{print $1}'
+    elif [ -x /sbin/sha256 ]; then # FreeBSD
+        #   shellcheck disable=SC2016
+        /sbin/sha256 -r "$sha256compute_FILE" | "$DKMLSYS_AWK" '{print $1}'
     else
         printf "FATAL: %s\n" "No sha256 checksum utility found" >&2
         exit 107
@@ -2849,12 +2855,22 @@ sha256check() {
     shift
     sha256check_SUM="$1"
     shift
-    if [ -x /usr/bin/shasum ]; then
+
+    if [ -x /usr/bin/shasum ]; then # macOS, OpenBSD
         printf "%s  %s" "$sha256check_SUM" "$sha256check_FILE" | /usr/bin/shasum -a 256 -c >&2
-    elif [ -x /usr/bin/sha256sum ]; then
+    elif [ -x /usr/bin/sha256sum ]; then # Linux, MSYS2
         printf "%s  %s" "$sha256check_SUM" "$sha256check_FILE" | /usr/bin/sha256sum -c >&2
+    elif [ -x /sbin/sha256 ]; then # FreeBSD
+        /sbin/sha256 -c "$sha256check_SUM" "$sha256check_FILE" >&2
     else
         printf "FATAL: %s\n" "No sha256 checksum utility found" >&2
+
+        # REMOVEME!
+        if [ -d /sbin ]; then printf "/sbin:\n" >&2; ls /sbin >&2; fi
+        if [ -d /usr/sbin ]; then printf "/usr/sbin:\n" >&2; ls /usr/sbin >&2; fi
+        if [ -d /bin ]; then printf "/bin:\n" >&2; ls /bin >&2; fi
+        if [ -d /usr/bin ]; then printf "/usr/bin:\n" >&2; ls /usr/bin >&2; fi
+
         exit 107
     fi
 }

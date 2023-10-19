@@ -977,14 +977,12 @@ install_reproducible_script_with_args() {
         printf "set -euf\n"
         # shellcheck disable=SC2016
         printf 'if [ "${DKML_BUILD_TRACE:-}" = ON ] && [ "${DKML_BUILD_TRACE_LEVEL:-0}" -ge 2 ]; then\n'
-        printf "  exec env TOPDIR=\"\$PWD/%s/vendor/drc/all/emptytop\" bash -x %s " \
-            "$install_reproducible_script_with_args_BOOTSTRAPRELDIR" \
+        printf "  exec bash -x %s " \
             "$install_reproducible_script_with_args_BOOTSTRAPRELDIR/$install_reproducible_script_with_args_SCRIPTFILE"
         escape_args_for_shell "$@"
         printf "\n"
         printf "else\n"
-        printf "  exec env TOPDIR=\"\$PWD/%s/vendor/drc/all/emptytop\" %s " \
-            "$install_reproducible_script_with_args_BOOTSTRAPRELDIR" \
+        printf "  exec %s " \
             "$install_reproducible_script_with_args_BOOTSTRAPRELDIR/$install_reproducible_script_with_args_SCRIPTFILE"
         escape_args_for_shell "$@"
         printf "\n"

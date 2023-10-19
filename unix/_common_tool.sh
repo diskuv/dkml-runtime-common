@@ -25,9 +25,6 @@
 #
 # Inputs:
 #   DKMLDIR: The 'diskuv-ocaml' vendored directory containing '.dkmlroot'.
-#   TOPDIR: Optional. The project top directory containing 'dune-project'. If
-#     not specified it will be discovered from DKMLDIR.
-#   PLATFORM: One of the PLATFORMS defined in TOPDIR/Makefile
 #
 #################################################
 
@@ -61,29 +58,6 @@ if [ ! -e "$DKMLDIR/.dkmlroot" ]; then echo "FATAL: Not embedded within or launc
 # shellcheck disable=SC1091
 . "$DKMLDIR"/.dkmlroot
 dkml_root_version=$(printf "%s" "$dkml_root_version" | PATH=/usr/bin:/bin tr -d '\r')
-
-if [ -z "${TOPDIR:-}" ]; then
-    # Check at most 10 ancestors
-    if [ -n "${TOPDIR_CANDIDATE:-}" ]; then
-        TOPDIR=$(cd "$TOPDIR_CANDIDATE" && PATH=/usr/bin:/bin pwd)
-    else
-        TOPDIR=$(cd "$DKMLDIR" && cd .. && PATH=/usr/bin:/bin pwd) # `cd ..` works if DKMLDIR is a Windows path
-    fi
-    if [ ! -e "$TOPDIR/dune-project" ] && [ "$TOPDIR" != "/" ]; then TOPDIR=$(cd "$TOPDIR"/.. && PATH=/usr/bin:/bin pwd); fi
-    if [ ! -e "$TOPDIR/dune-project" ] && [ "$TOPDIR" != "/" ]; then TOPDIR=$(cd "$TOPDIR"/.. && PATH=/usr/bin:/bin pwd); fi
-    if [ ! -e "$TOPDIR/dune-project" ] && [ "$TOPDIR" != "/" ]; then TOPDIR=$(cd "$TOPDIR"/.. && PATH=/usr/bin:/bin pwd); fi
-    if [ ! -e "$TOPDIR/dune-project" ] && [ "$TOPDIR" != "/" ]; then TOPDIR=$(cd "$TOPDIR"/.. && PATH=/usr/bin:/bin pwd); fi
-    if [ ! -e "$TOPDIR/dune-project" ] && [ "$TOPDIR" != "/" ]; then TOPDIR=$(cd "$TOPDIR"/.. && PATH=/usr/bin:/bin pwd); fi
-    if [ ! -e "$TOPDIR/dune-project" ] && [ "$TOPDIR" != "/" ]; then TOPDIR=$(cd "$TOPDIR"/.. && PATH=/usr/bin:/bin pwd); fi
-    if [ ! -e "$TOPDIR/dune-project" ] && [ "$TOPDIR" != "/" ]; then TOPDIR=$(cd "$TOPDIR"/.. && PATH=/usr/bin:/bin pwd); fi
-    if [ ! -e "$TOPDIR/dune-project" ] && [ "$TOPDIR" != "/" ]; then TOPDIR=$(cd "$TOPDIR"/.. && PATH=/usr/bin:/bin pwd); fi
-    if [ ! -e "$TOPDIR/dune-project" ] && [ "$TOPDIR" != "/" ]; then TOPDIR=$(cd "$TOPDIR"/.. && PATH=/usr/bin:/bin pwd); fi
-    if [ ! -e "$TOPDIR/dune-project" ] && [ "$TOPDIR" != "/" ]; then TOPDIR=$(cd "$TOPDIR"/.. && PATH=/usr/bin:/bin pwd); fi
-    if [ ! -e "$TOPDIR/dune-project" ]; then echo "FATAL: Not embedded in a Dune-based project with a 'dune-project' file" >&2 ; exit 1; fi
-fi
-
-# TOPDIR is sticky, so that platform-opam-exec.sh and any other scripts can be called as children and behave correctly.
-export TOPDIR
 
 if [ -x /usr/bin/cygpath ]; then
     OS_DIR_SEP="\\"

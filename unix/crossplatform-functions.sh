@@ -2798,7 +2798,7 @@ log_trace() {
         rm|cp)
             # debug level. only show when DKML_BUILD_TRACE=ON
             ;;
-        git|make|ocaml_configure|ocaml_make|make_host|make_target)
+        git|make|ocaml_configure|ocaml_make|make_host|make_target|*/platform-opam-exec.sh)
             # info level. and can show entire command without polluting the screen
             printf "[%s] %s\n" "$(try_iso8601_timestamp)" "$*" >&2
             ;;

@@ -2473,6 +2473,7 @@ autodetect_compiler_vsdev() {
     # - CI_* (CI_JOB_JWT, CI_JOB_TOKEN, CI_REGISTRY_PASSWORD) on GitLab CI / GitHub Actions
     # - *_DEPLOY_TOKEN (DKML_PACKAGE_PUBLISH_PRIVATE_DEPLOY_TOKEN)
     # - PG* (PGUSER, PGPASSWORD) on GitHub Actions
+    # - OPAM* (OPAMROOT, OPAM_SWITCH)
     # - HOME* (HOME, HOMEDRIVE, HOMEPATH)
     # - USER* (USERNAME, USERPROFILE, USERDOMAIN, USERDOMAIN_ROAMINGPROFILE)
     # shellcheck disable=SC2016
@@ -2503,7 +2504,7 @@ autodetect_compiler_vsdev() {
     $1 != "PROMPT" && $1 !~ /^LOGON/ && $1 !~ /APPDATA$/ &&
     $1 != "ALLUSERSPROFILE" && $1 != "CYGWIN" && $1 != "CYGPATH" &&
     $1 !~ /^CI_/ && $1 !~ /_DEPLOY_TOKEN$/ && $1 !~ /^PG/ &&
-    $1 !~ /^HOME/ &&
+    $1 !~ /^OPAM/ && $1 !~ /^HOME/ &&
     $1 !~ /^USER/ {name=$1; value=$0; sub(/^[^=]*=/,"",value); print name "=" value}
 
     $1 == "INCLUDE" {name=$1; value=$0; sub(/^[^=]*=/,"",value); print name "=" value}

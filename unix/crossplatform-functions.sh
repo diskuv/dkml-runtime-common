@@ -81,10 +81,10 @@ autodetect_posix_shell() {
 # - env:DKMLPARENTHOME_BUILDHOST
 set_dkmlparenthomedir() {
     if [ -n "${LOCALAPPDATA:-}" ]; then
-        DKMLPARENTHOME_BUILDHOST="$LOCALAPPDATA\\Programs\\DiskuvOCaml"
+        DKMLPARENTHOME_BUILDHOST="$LOCALAPPDATA\\Programs\\DkML"
     else
         # shellcheck disable=SC2034
-        DKMLPARENTHOME_BUILDHOST="${XDG_DATA_HOME:-$HOME/.local/share}/diskuv-ocaml"
+        DKMLPARENTHOME_BUILDHOST="${XDG_DATA_HOME:-$HOME/.local/share}/dkml"
     fi
 }
 

@@ -625,7 +625,6 @@ install_reproducible_common() {
     install_reproducible_common_BOOTSTRAPDIR=$DEPLOYDIR_UNIX/$SHARE_REPRODUCIBLE_BUILD_RELPATH/$BOOTSTRAPNAME
     "$DKMLSYS_INSTALL" -d "$install_reproducible_common_BOOTSTRAPDIR"
     install_reproducible_file .dkmlroot
-    install_reproducible_file vendor/drc/all/emptytop/dune-project
     install_reproducible_file vendor/drc/unix/crossplatform-functions.sh
     install_reproducible_file vendor/drc/unix/_common_tool.sh
 }

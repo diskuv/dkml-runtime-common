@@ -19,5 +19,4 @@
   (macos/brewbundle.sh as macos/brewbundle.sh)
   (unix/_common_tool.sh as unix/_common_tool.sh)
   (unix/_within_dev.sh as unix/_within_dev.sh)
-  (unix/crossplatform-functions.sh as unix/crossplatform-functions.sh)
-  (all/emptytop/dune-project as all/emptytop/dune-project)))
+  (unix/crossplatform-functions.sh as unix/crossplatform-functions.sh)))

@@ -16,7 +16,7 @@
 # ----------------------------
 #
 # @jonahbeckford: 2021-09-07
-# - This file is licensed differently than the rest of the Diskuv OCaml distribution.
+# - This file is licensed differently than the rest of the DkML distribution.
 #   Keep the Apache License in this file since this file is part of the reproducible
 #   build files.
 #
@@ -88,7 +88,7 @@ set_dkmlparenthomedir() {
     fi
 }
 
-# Detects Diskuv OCaml and sets its variables.
+# Detects DkML and sets its variables.
 #
 # If the environment variables already exist they are not overwritten.
 # Setting these variables is useful for example _during_ a deployment, where the
@@ -103,12 +103,12 @@ set_dkmlparenthomedir() {
 # - env:DiskuvOCamlMSYS2Dir - optional
 # Outputs:
 # - env:DKMLPARENTHOME_BUILDHOST
-# - env:DKMLVERSION - set if Diskuv OCaml installed. The installed version number
-# - env:DKMLHOME_BUILDHOST - set if Diskuv OCaml installed. Path will be in Windows (semicolon separated) or Unix (colon separated) format
-# - env:DKMLHOME_UNIX - set if Diskuv OCaml installed. Path will be in Unix (colon separated) format
-# - env:DKMLBINPATHS_BUILDHOST - set if Diskuv OCaml installed. Paths will be in Windows (semicolon separated) or Unix (colon separated) format
-# - env:DKMLBINPATHS_UNIX - set if Diskuv OCaml installed. Paths will be in Unix (colon separated) format
-# - env:DKMLMSYS2DIR_BUILDHOST - set if DiskuvO Caml installed MSYS2. Directory will be in Windows format
+# - env:DKMLVERSION - set if DkML installed. The installed version number
+# - env:DKMLHOME_BUILDHOST - set if DkML installed. Path will be in Windows (semicolon separated) or Unix (colon separated) format
+# - env:DKMLHOME_UNIX - set if DkML installed. Path will be in Unix (colon separated) format
+# - env:DKMLBINPATHS_BUILDHOST - set if DkML installed. Paths will be in Windows (semicolon separated) or Unix (colon separated) format
+# - env:DKMLBINPATHS_UNIX - set if DkML installed. Paths will be in Unix (colon separated) format
+# - env:DKMLMSYS2DIR_BUILDHOST - set if DkML installed MSYS2. Directory will be in Windows format
 # Return Code:
 # - 1 if DiskuvOCaml is not installed
 autodetect_dkmlvars() {
@@ -162,7 +162,7 @@ autodetect_dkmlvars() {
 
     # Validate DiskuvOCamlVarsVersion. Can be v1 or v2 since only the .sexp file changed in v2.
     if [ ! "$DiskuvOCamlVarsVersion" = "1" ] && [ ! "$DiskuvOCamlVarsVersion" = "2" ]; then
-        printf "FATAL: Only able to read Diskuv OCaml variables version '1' and '2'. Instead Diskuv OCaml variables for %s were on version '%s'\n" "$DiskuvOCamlHome" "$DiskuvOCamlVarsVersion" >&2
+        printf "FATAL: Only able to read DkML variables version '1' and '2'. Instead DkML variables for %s were on version '%s'\n" "$DiskuvOCamlHome" "$DiskuvOCamlVarsVersion" >&2
         exit 107
     fi
 
@@ -356,7 +356,7 @@ autodetect_system_path() {
 #
 # The only situation where it makes sense is if you know you must use the
 # system git (ex. Git for Windows). In that situation you don't want any
-# private git (ex. MSYS2 from Diskuv OCaml) to be used if present (that would
+# private git (ex. MSYS2 from DkML) to be used if present (that would
 # happen if you used `autodetect_system_path`).
 #
 # On Windows this includes the Cygwin/MSYS2 paths, the  but also Windows directories
@@ -540,7 +540,7 @@ is_unixy_windows_build_machine() {
 }
 
 # Is a MSYS2 environment with the MSYS or MINGW64 subsystem?
-# * MSYS2 can also do MinGW 32-bit and 64-bit subsystems. Used by Diskuv OCaml
+# * MSYS2 can also do MinGW 32-bit and 64-bit subsystems. Used by DkML
 # * MINGW64 used by Git Bash (aka. GitHub Actions `shell: bash`)
 # https://www.msys2.org/docs/environments/
 is_msys2_msys_build_machine() {
@@ -1116,7 +1116,7 @@ autodetect_cpus() {
 }
 
 # Set VSDEV_HOME_UNIX and VSDEV_HOME_BUILDHOST, if Visual Studio was installed or detected during
-# Windows Diskuv OCaml installation.
+# Windows DkML installation.
 #
 # Inputs:
 # - $1 - Optional. If provided, then $1/include and $1/lib are added to INCLUDE and LIB, respectively
@@ -1160,7 +1160,7 @@ autodetect_cpus() {
 #   if and only if Visual Studio was detected. Will be Windows path if Windows. Empty if Visual Studio not detected.
 # Return Values:
 # - 0: Success or a non-Windows machine. A non-Windows machine will have all outputs set to blank
-# - 1: Windows machine without proper Diskuv OCaml installation (typically you should exit fatally)
+# - 1: Windows machine without proper DkML installation (typically you should exit fatally)
 autodetect_vsdev() {
     export VSDEV_HOME_UNIX=
     export VSDEV_HOME_BUILDHOST=
@@ -1753,7 +1753,7 @@ autodetect_compiler_cmake_get_config_flags() {
 # Generally the variables conform to the description in
 # https://www.gnu.org/software/make/manual/html_node/Implicit-Variables.html.
 # The compiler will have been chosen from:
-# a) find the compiler selected/validated in the Diskuv OCaml installation
+# a) find the compiler selected/validated in the DkML installation
 #    (Windows) or on first-use (Unix)
 # b) the specific architecture that has been given in DKML_TARGET_ABI
 #

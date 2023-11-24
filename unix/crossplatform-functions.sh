@@ -1729,6 +1729,39 @@ autodetect_compiler_cmake_get_config_flags() {
     $DKMLSYS_RM -f "$autodetect_compiler_OUTPUTFILE.flags.source"
 }
 
+# Users must use the DKML_TARGET_ABI and DKML_COMPILE_* environment variables so
+# cross-compilation is unambiguous.
+compiler_clear_environment() {
+    # Unix autoconf
+    export CC=
+    export CXX=
+    export CFLAGS=
+    export CXXFLAGS=
+    export AS=
+    export ASFLAGS=
+    export LD=
+    export LDFLAGS=
+    export LDLIBS=
+    export AR=
+
+    # msvs-detect
+    export MSVS_NAME=
+    export MSVS_PATH=
+    export MSVS_INC=
+    export MSVS_LIB=
+    export MSVS_ML=
+    export MSVS64_NAME=
+    export MSVS64_PATH=
+    export MSVS64_INC=
+    export MSVS64_LIB=
+    export MSVS64_ML=
+    export MSVS_PREFERENCE=
+
+    # Visual Studio
+    export INCLUDE=
+    export LIB=
+}
+
 # Used by DKML's autodetect_compiler() function to customize compiler
 # variables before the variables are written to a launcher script.
 #

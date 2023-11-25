@@ -1363,6 +1363,7 @@ cmake_flag_notfound() {
 # - env:DKML_COMPILE_SPEC - Optional. If specified will be a specification number, which determines which
 #   other environment variables have to be supplied and the format of each variable.
 #   Only spec 1 is supported today:
+#   - env:DKML_COMPILE_TYPE - "SYS" for the system which compiles for the host ABI.
 #   - env:DKML_COMPILE_TYPE - "VS" for Visual Studio. The following vars must be defined:
 #     - env:DKML_COMPILE_VS_DIR - The
 #       specified installation directory of Visual Studio will be used.
@@ -1538,6 +1539,13 @@ autodetect_compiler() {
     else
         autodetect_compiler_TEMPDIR=$(PATH=/usr/bin:/bin mktemp -d /tmp/dkmlc.XXXXX)
     fi
+    if [ -x /usr/bin/cygpath ]; then
+        autodetect_compiler_TEMPDIR_WIN=$(/usr/bin/cygpath -aw "$autodetect_compiler_TEMPDIR")
+        autodetect_compiler_TEMPDIR_DOS=$(/usr/bin/cygpath -ad "$autodetect_compiler_TEMPDIR")
+    else
+        autodetect_compiler_TEMPDIR_WIN="$autodetect_compiler_TEMPDIR"
+        autodetect_compiler_TEMPDIR_DOS="$autodetect_compiler_TEMPDIR"
+    fi
     if [ -n "${DKML_TARGET_ABI:-}" ]; then
         autodetect_compiler_PLATFORM_ARCH=$DKML_TARGET_ABI
     else
@@ -1591,7 +1599,7 @@ autodetect_compiler() {
                 fi
                 ;;
             *)
-                printf "DKML compile spec 1 was not followed. DKML_COMPILE_TYPE must be VS or CM\n" >&2
+                printf "DKML compile spec 1 was not followed. DKML_COMPILE_TYPE must be SYS, VS or CM\n" >&2
                 exit 107
             ;;
         esac
@@ -1656,14 +1664,17 @@ autodetect_compiler() {
         [ "${DKML_BUILD_TRACE:-OFF}" = OFF ] || printf "+: autodetect_vsdev DKML_COMPILE_SPEC=1 DKML_COMPILE_TYPE=VS\n" >&2
         autodetect_vsdev # set DKMLPARENTHOME_BUILDHOST and VSDEV_*
         [ "${DKML_BUILD_TRACE:-OFF}" = OFF ] || printf "+: autodetect_compiler_vsdev DKML_COMPILE_SPEC=1 DKML_COMPILE_TYPE=VS\n" >&2
-        autodetect_compiler_vsdev
+        autodetect_compiler_vsdev "$VSDEV_HOME_UNIX"
     elif [ "${DKML_COMPILE_SPEC:-}" = 1 ] && [ "${DKML_COMPILE_TYPE:-}" = CM ]; then
         [ "${DKML_BUILD_TRACE:-OFF}" = OFF ] || printf "+: autodetect_compiler_cmake DKML_COMPILE_SPEC=1 DKML_COMPILE_TYPE=CM\n" >&2
         autodetect_compiler_cmake
+    elif [ "${DKML_COMPILE_SPEC:-}" = 1 ] && [ "${DKML_COMPILE_TYPE:-}" = SYS ]; then
+        [ "${DKML_BUILD_TRACE:-OFF}" = OFF ] || printf "+: autodetect_compiler_system DKML_COMPILE_SPEC=1 DKML_COMPILE_TYPE=SYS\n" >&2
+        autodetect_compiler_system
     elif autodetect_vsdev && [ -n "$VSDEV_HOME_UNIX" ]; then
         # `autodetect_vsdev` will have set DKMLPARENTHOME_BUILDHOST and VSDEV_*
         [ "${DKML_BUILD_TRACE:-OFF}" = OFF ] || printf "+: autodetect_compiler_vsdev autodetect_vsdev=true VSDEV_HOME_UNIX=%s\n" "$VSDEV_HOME_UNIX" >&2
-        autodetect_compiler_vsdev
+        autodetect_compiler_vsdev "$VSDEV_HOME_UNIX"
     elif [ "$autodetect_compiler_PLATFORM_ARCH" = "darwin_x86_64" ] || [ "$autodetect_compiler_PLATFORM_ARCH" = "darwin_arm64" ]; then
         [ "${DKML_BUILD_TRACE:-OFF}" = OFF ] || printf "+: autodetect_compiler_darwin PLATFORM_ARCH=darwin_{x86_64,arm64}\n" >&2
         autodetect_compiler_darwin
@@ -2263,36 +2274,58 @@ autodetect_compiler_cmake() {
 }
 
 autodetect_compiler_system() {
-    # Standardized compiler environment variables
-    autodetect_compiler_CC=$(command -v gcc || true)
-    if [ -n "$autodetect_compiler_CC" ]; then
-        case "$autodetect_compiler_PLATFORM_ARCH" in
-            *_x86 | *_arm32*)
-                autodetect_compiler_CFLAGS=-m32
-                ;;
-        esac
-        autodetect_compiler_CXX=$(command -v g++ || true)
-        if [ -n "$autodetect_compiler_CXX" ]; then
+    if [ -x /usr/bin/cygpath ]; then
+        # https://github.com/microsoft/vswhere
+        # %ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe
+        autodetect_compiler_system_ProgramFilesX86=$(/usr/bin/cygpath --folder 42)
+        autodetect_compiler_system_VSWHERE="$autodetect_compiler_system_ProgramFilesX86/Microsoft Visual Studio/Installer/vswhere.exe"
+        if [ -x "$autodetect_compiler_system_VSWHERE" ]; then
+            # Check for a compatible Visual Studio with logic similar to dkml-runtime-distribution's Machine.psm1 (which is authoritatize and better!)
+            autodetect_compiler_system_COMPATIBLE_INSTALLDIR=$("$autodetect_compiler_system_VSWHERE" -products '*' \
+                -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 \
+                -requires Microsoft.VisualStudio.Component.VC.14.25.x86.x64 \
+                -requires Microsoft.VisualStudio.Component.VC.14.26.x86.x64 \
+                -requires Microsoft.VisualStudio.Component.VC.14.29.x86.x64 \
+                -requiresAny \
+                -property installationPath \
+                -latest || true)
+            if [ -n "$autodetect_compiler_system_COMPATIBLE_INSTALLDIR" ]; then
+                autodetect_compiler_vsdev "$autodetect_compiler_system_COMPATIBLE_INSTALLDIR"
+                return # done. [autodetect_compiler_vsdev] wrote the compiler variables
+            fi
+        fi
+    else
+        # Standardized compiler environment variables
+        autodetect_compiler_CC=$(command -v gcc || true)
+        if [ -n "$autodetect_compiler_CC" ]; then
             case "$autodetect_compiler_PLATFORM_ARCH" in
                 *_x86 | *_arm32*)
-                    autodetect_compiler_CXXFLAGS=-m32
+                    autodetect_compiler_CFLAGS=-m32
                     ;;
             esac
-        fi
-        autodetect_compiler_AS=$(command -v as || true)
-        if [ -n "$autodetect_compiler_AS" ]; then
-            case "$autodetect_compiler_PLATFORM_ARCH" in
-                *_x86 | *_arm32*)
-                    autodetect_compiler_ASFLAGS=--32
-                    ;;
-            esac
-        fi
-        autodetect_compiler_LD=$(command -v ld || true)
-        if [ -n "$autodetect_compiler_LD" ]; then
-            case "$autodetect_compiler_PLATFORM_ARCH" in
-                linux_x86)    autodetect_compiler_LDFLAGS=-melf_i386 ;;
-                linux_x86_64) autodetect_compiler_LDFLAGS=-melf_x86_64 ;;
-            esac
+            autodetect_compiler_CXX=$(command -v g++ || true)
+            if [ -n "$autodetect_compiler_CXX" ]; then
+                case "$autodetect_compiler_PLATFORM_ARCH" in
+                    *_x86 | *_arm32*)
+                        autodetect_compiler_CXXFLAGS=-m32
+                        ;;
+                esac
+            fi
+            autodetect_compiler_AS=$(command -v as || true)
+            if [ -n "$autodetect_compiler_AS" ]; then
+                case "$autodetect_compiler_PLATFORM_ARCH" in
+                    *_x86 | *_arm32*)
+                        autodetect_compiler_ASFLAGS=--32
+                        ;;
+                esac
+            fi
+            autodetect_compiler_LD=$(command -v ld || true)
+            if [ -n "$autodetect_compiler_LD" ]; then
+                case "$autodetect_compiler_PLATFORM_ARCH" in
+                    linux_x86)    autodetect_compiler_LDFLAGS=-melf_i386 ;;
+                    linux_x86_64) autodetect_compiler_LDFLAGS=-melf_x86_64 ;;
+                esac
+            fi
         fi
     fi
 
@@ -2335,11 +2368,21 @@ autodetect_compiler_vsdev() {
     # Implementation note: You can use `autodetect_compiler_` as the prefix for your variables,
     # and read the variables created by `autodetect_compiler()`
 
-    # The vsdevcmd.bat is at /c/DiskuvOCaml/BuildTools/Common7/Tools/VsDevCmd.bat.
-    if [ -e "$VSDEV_HOME_UNIX"/Common7/Tools/VsDevCmd.bat ]; then
-        autodetect_compiler_VSDEVCMD="$VSDEV_HOME_UNIX/Common7/Tools/VsDevCmd.bat"
+    autodetect_compiler_vsdev_INSTALLDIR_UNIX=$1
+    shift
+
+    if [ -x /usr/bin/cygpath ]; then
+        autodetect_compiler_vsdev_INSTALLDIR_BUILDHOST=$(/usr/bin/cygpath -aw "$autodetect_compiler_vsdev_INSTALLDIR_UNIX")
+        autodetect_compiler_vsdev_INSTALLDIR_UNIX=$(/usr/bin/cygpath -au "$autodetect_compiler_vsdev_INSTALLDIR_UNIX")
     else
-        echo "FATAL: No Common7/Tools/VsDevCmd.bat was detected at $VSDEV_HOME_UNIX" >&2
+        autodetect_compiler_vsdev_INSTALLDIR_BUILDHOST="$autodetect_compiler_vsdev_INSTALLDIR_UNIX"
+    fi
+
+    # The vsdevcmd.bat is at /c/DiskuvOCaml/BuildTools/Common7/Tools/VsDevCmd.bat.
+    if [ -e "$autodetect_compiler_vsdev_INSTALLDIR_UNIX"/Common7/Tools/VsDevCmd.bat ]; then
+        autodetect_compiler_vsdev_VSDEVCMD="$autodetect_compiler_vsdev_INSTALLDIR_UNIX/Common7/Tools/VsDevCmd.bat"
+    else
+        echo "FATAL: No Common7/Tools/VsDevCmd.bat was detected at $autodetect_compiler_vsdev_INSTALLDIR_UNIX" >&2
         exit 107
     fi
 
@@ -2350,13 +2393,9 @@ autodetect_compiler_vsdev() {
     # to the bottom of it so we can inspect the environment variables.
     # (Less hacky version of https://help.appveyor.com/discussions/questions/18777-how-to-use-vcvars64bat-from-powershell)
     if [ -x /usr/bin/cygpath ]; then
-        autodetect_compiler_VSDEVCMDFILE_WIN=$(/usr/bin/cygpath -aw "$autodetect_compiler_VSDEVCMD")
-        autodetect_compiler_TEMPDIR_WIN=$(/usr/bin/cygpath -aw "$autodetect_compiler_TEMPDIR")
-        autodetect_compiler_TEMPDIR_DOS=$(/usr/bin/cygpath -ad "$autodetect_compiler_TEMPDIR")
+        autodetect_compiler_VSDEVCMDFILE_WIN=$(/usr/bin/cygpath -aw "$autodetect_compiler_vsdev_VSDEVCMD")
     else
-        autodetect_compiler_VSDEVCMDFILE_WIN="$autodetect_compiler_VSDEVCMD"
-        autodetect_compiler_TEMPDIR_WIN="$autodetect_compiler_TEMPDIR"
-        autodetect_compiler_TEMPDIR_DOS="$autodetect_compiler_TEMPDIR"
+        autodetect_compiler_VSDEVCMDFILE_WIN="$autodetect_compiler_vsdev_VSDEVCMD"
     fi
     {
         printf "@set TEMP=%s\n" "$autodetect_compiler_TEMPDIR_DOS"
@@ -2566,7 +2605,7 @@ autodetect_compiler_vsdev() {
         BEGIN{FS="="} $1 == "VSCMD_ARG_TGT_ARCH" {name=$1; value=$0; sub(/^[^=]*=/,"",value);                print value}
         ' "$autodetect_compiler_TEMPDIR"/vcvars.txt)
     if ! PATH="$autodetect_compiler_COMPILER_PATH_UNIX" "$autodetect_compiler_vsdev_VALIDATE_ASM" -help >/dev/null 2>/dev/null; then
-        echo "FATAL: The Visual Studio installation \"$VSDEV_HOME_BUILDHOST\" did not place '$autodetect_compiler_vsdev_VALIDATE_ASM' in its PATH." >&2
+        echo "FATAL: The Visual Studio installation \"$autodetect_compiler_vsdev_INSTALLDIR_BUILDHOST\" did not place '$autodetect_compiler_vsdev_VALIDATE_ASM' in its PATH." >&2
         echo "       It should be present for the target ABI $autodetect_compiler_PLATFORM_ARCH ($autodetect_compiler_TGTARCH) on a build host $BUILDHOST_ARCH." >&2
         echo "  Fix? Run the Visual Studio Installer and then:" >&2
         echo "       1. Make sure you have the MSVC v$VSDEV_VCVARSVER $autodetect_compiler_TGTARCH Build Tools component." >&2
@@ -2652,7 +2691,7 @@ autodetect_compiler_vsdev() {
     autodetect_compiler_MSVS3=$($DKMLSYS_CAT "$autodetect_compiler_TEMPDIR"/msvs3.txt)
     autodetect_compiler_MSVS4=$($DKMLSYS_CAT "$autodetect_compiler_TEMPDIR"/msvs4.txt)
     autodetect_compiler_MSVS5=$($DKMLSYS_CAT "$autodetect_compiler_TEMPDIR"/msvs5.txt)
-    autodetect_compiler_MSVS_NAME="$autodetect_compiler_MSVS1 $autodetect_compiler_MSVS4 $autodetect_compiler_MSVS5 $autodetect_compiler_MSVS2 $autodetect_compiler_MSVS3 $VSDEV_HOME_BUILDHOST"
+    autodetect_compiler_MSVS_NAME="$autodetect_compiler_MSVS1 $autodetect_compiler_MSVS4 $autodetect_compiler_MSVS5 $autodetect_compiler_MSVS2 $autodetect_compiler_MSVS3 $autodetect_compiler_vsdev_INSTALLDIR_BUILDHOST"
 
     # === autodetect_compiler_MSVS_INC
     # shellcheck disable=SC2016
@@ -2695,12 +2734,12 @@ autodetect_compiler_vsdev() {
 
         # Add CMAKE_GENERATOR_RECOMMENDED and CMAKE_GENERATOR_INSTANCE_RECOMMENDED
         if [ "$autodetect_compiler_OUTPUTMODE" = SEXP ]; then
-            autodetect_compiler_VSDEV_HOME_BUILDHOST_QUOTED=$(printf "%s" "$VSDEV_HOME_BUILDHOST" | autodetect_compiler_escape_sexp)
+            autodetect_compiler_VSDEV_HOME_BUILDHOST_QUOTED=$(printf "%s" "$autodetect_compiler_vsdev_INSTALLDIR_BUILDHOST" | autodetect_compiler_escape_sexp)
             printf "%s\n" "  (\"CMAKE_GENERATOR_RECOMMENDED\" \"$VSDEV_CMAKEGENERATOR\")"
             printf "%s\n" "  (\"CMAKE_GENERATOR_INSTANCE_RECOMMENDED\" \"$autodetect_compiler_VSDEV_HOME_BUILDHOST_QUOTED\")"
         elif [ "$autodetect_compiler_OUTPUTMODE" = LAUNCHER ]; then
             printf "%s\n" "  CMAKE_GENERATOR_RECOMMENDED='$VSDEV_CMAKEGENERATOR' \\"
-            printf "%s\n" "  CMAKE_GENERATOR_INSTANCE_RECOMMENDED='$VSDEV_HOME_BUILDHOST' \\"
+            printf "%s\n" "  CMAKE_GENERATOR_INSTANCE_RECOMMENDED='$autodetect_compiler_vsdev_INSTALLDIR_BUILDHOST' \\"
         fi
 
         # Add PATH

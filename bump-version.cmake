@@ -8,6 +8,7 @@ include(${DKML_BUMP_VERSION_PARTICIPANT_MODULE})
 
 DkMLBumpVersionParticipant_PlainReplace(template.dkmlroot)
 DkMLBumpVersionParticipant_PlainReplace(README.md)
+DkMLBumpVersionParticipant_PlainReplace(unix/crossplatform-functions.sh)
 DkMLBumpVersionParticipant_MetaReplace(META)
 DkMLBumpVersionParticipant_OpamReplace(dkml-runtime-common.opam)
 DkMLBumpVersionParticipant_OpamReplace(dkml-runtime-common-native.opam)

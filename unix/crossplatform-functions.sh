@@ -88,6 +88,17 @@ set_dkmlparenthomedir() {
     fi
 }
 
+set_default_dkmlnativedir() {
+    if [ -n "${LOCALAPPDATA:-}" ]; then
+        DKMLNATIVEDIR_BUILDHOST="$LOCALAPPDATA\\Programs\\DkMLNative"
+    elif is_macos_build_machine; then
+        DKMLNATIVEDIR_BUILDHOST="$HOME/Applications/DkMLNative"
+    else
+        # shellcheck disable=SC2034
+        DKMLNATIVEDIR_BUILDHOST="${XDG_DATA_HOME:-$HOME/.local/share}/dkml-native"
+    fi
+}
+
 # Detects DkML and sets its variables.
 #
 # If the environment variables already exist they are not overwritten.
@@ -110,7 +121,20 @@ set_dkmlparenthomedir() {
 # - env:DKMLBINPATHS_UNIX - set if DkML installed. Paths will be in Unix (colon separated) format
 # - env:DKMLMSYS2DIR_BUILDHOST - set if DkML installed MSYS2. Directory will be in Windows format
 # Return Code:
-# - 1 if DiskuvOCaml is not installed
+# - 1 if DkML is not installed
+default_dkmlvars() {
+    set_default_dkmlnativedir # Native is the default mode, not Bytecode
+    autodetect_dkmlvars_DiskuvOCamlVarsVersion_Override=2
+    if [ -x /usr/bin/cygpath ]; then
+        autodetect_dkmlvars_DiskuvOCamlHome_Override=$(/usr/bin/cygpath -a "$DKMLNATIVEDIR_BUILDHOST")
+    else
+        autodetect_dkmlvars_DiskuvOCamlHome_Override=$DKMLNATIVEDIR_BUILDHOST
+    fi
+    autodetect_dkmlvars_DiskuvOCamlBinaryPaths_Override="$autodetect_dkmlvars_DiskuvOCamlHome_Override/usr/bin;$autodetect_dkmlvars_DiskuvOCamlHome_Override/bin"
+    autodetect_dkmlvars_DiskuvOCamlDeploymentId_Override="default-592592597"
+    autodetect_dkmlvars_DiskuvOCamlVersion_Override=2.1.0
+    autodetect_dkmlvars_DiskuvOCamlMSYS2Dir_Override=
+}
 autodetect_dkmlvars() {
     autodetect_dkmlvars_DiskuvOCamlVarsVersion_Override=${DiskuvOCamlVarsVersion:-}
     autodetect_dkmlvars_DiskuvOCamlHome_Override=${DiskuvOCamlHome:-}
@@ -139,11 +163,15 @@ autodetect_dkmlvars() {
                 # shellcheck disable=SC1090
                 . "$DKMLPARENTHOME_BUILDHOST\\dkmlvars.sh"
             fi
+        else
+            default_dkmlvars
         fi
     else
         if [ -e "$DKMLPARENTHOME_BUILDHOST/dkmlvars.sh" ]; then
             # shellcheck disable=SC1091
             . "$DKMLPARENTHOME_BUILDHOST/dkmlvars.sh"
+        else
+            default_dkmlvars
         fi
     fi
     # Overrides
@@ -554,6 +582,13 @@ is_msys2_msys_build_machine() {
 
 is_cygwin_build_machine() {
     if [ -e /usr/bin/cygwin1.dll ]; then
+        return 0
+    fi
+    return 1
+}
+
+is_macos_build_machine() {
+    if [ -x /usr/bin/uname ] && [ "$(/usr/bin/uname -s)" = Darwin ]; then
         return 0
     fi
     return 1

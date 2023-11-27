@@ -24,7 +24,7 @@
 # _common_tool.sh
 #
 # Inputs:
-#   DKMLDIR: The 'diskuv-ocaml' vendored directory containing '.dkmlroot'.
+#   DKMLDIR: The DkML vendored directory containing '.dkmlroot'.
 #
 #################################################
 
@@ -52,7 +52,7 @@ is_reproducible_platform() {
     is_arg_linux_based_platform "$PLATFORM"
 }
 
-if [ ! -e "$DKMLDIR/.dkmlroot" ]; then echo "FATAL: Not embedded within or launched from a 'diskuv-ocaml' Local Project" >&2 ; exit 1; fi
+if [ ! -e "$DKMLDIR/.dkmlroot" ]; then echo "FATAL: Not launched within a directory tree containing a .dkmlroot file" >&2 ; exit 1; fi
 
 # set $dkml_root_version
 # shellcheck disable=SC1091

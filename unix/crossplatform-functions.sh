@@ -1150,6 +1150,14 @@ autodetect_cpus() {
     export NUMCPUS
 }
 
+# ex. VS16.11 from VSCMD_VER=16.11.3
+vscmd_ver_to_vsstudio_msvspreference() {
+    vscmd_ver_to_vsstudio_msvspreference_VER=$1
+    shift
+    #   shellcheck disable=SC2016
+    printf "VS%s" "$vscmd_ver_to_vsstudio_msvspreference_VER" | "$DKMLSYS_AWK" 'BEGIN{RS="\r\n"; FS="."} {print $1 "." $2; exit}'
+}
+
 # Set VSDEV_HOME_UNIX and VSDEV_HOME_BUILDHOST, if Visual Studio was installed or detected during
 # Windows DkML installation.
 #
@@ -1228,8 +1236,7 @@ autodetect_vsdev() {
         #   shellcheck disable=SC2016
         autodetect_vsdev_VSSTUDIOWINSDKVER=$(printf "%s" "$WindowsSDKVersion" | "$DKMLSYS_AWK" 'BEGIN{RS="\r\n"} {print; exit}' | "$DKMLSYS_SED" 's#\\$##')
         # ex. VS16.11 from VSCMD_VER=16.11.3
-        #   shellcheck disable=SC2016
-        autodetect_vsdev_VSSTUDIOMSVSPREFERENCE=$(printf "VS%s" "$VSCMD_VER" | "$DKMLSYS_AWK" 'BEGIN{RS="\r\n"; FS="."} {print $1 "." $2; exit}')
+        autodetect_vsdev_VSSTUDIOMSVSPREFERENCE=$(vscmd_ver_to_vsstudio_msvspreference "$VSCMD_VER")
         # VisualStudioVersion=16.0 -> Visual Studio 16 2019
         #   shellcheck disable=SC2016
         autodetect_vsdev_VSSTUDIOVER=$(printf "%s" "$VisualStudioVersion" | "$DKMLSYS_AWK" 'BEGIN{RS="\r\n"; FS="."} {print $1; exit}')
@@ -2473,11 +2480,19 @@ autodetect_compiler_vsdev() {
     #  * we use armv7-pc-windows on ARM32 because OCaml's ./configure needs the ARM model (v6, v7, etc.).
     #    WinCE 7.0 and 8.0 support ARMv7, but don't mandate it; WinCE 8.0 extended support from MS is in
     #    2023 so ARMv7 should be fine.
-    autodetect_compiler_vsdev_dump_vars_helper() {
-        "$DKMLSYS_ENV" PATH="$autodetect_compiler_vsdev_SYSTEMPATHUNIX" __VSCMD_ARG_NO_LOGO=1 VSCMD_SKIP_SENDTELEMETRY=1 VSCMD_DEBUG="$autodetect_compiler_VSCMD_DEBUG" \
-            "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat -no_logo -vcvars_ver="$VSDEV_VCVARSVER" -winsdk="$VSDEV_WINSDKVER" \
-            "$@" >&2
-    }
+    if [ -n "${VSDEV_VCVARSVER:-}" ] && [ -n "${VSDEV_WINSDKVER}" ]; then
+        autodetect_compiler_vsdev_dump_vars_helper() {
+            "$DKMLSYS_ENV" PATH="$autodetect_compiler_vsdev_SYSTEMPATHUNIX" __VSCMD_ARG_NO_LOGO=1 VSCMD_SKIP_SENDTELEMETRY=1 VSCMD_DEBUG="$autodetect_compiler_VSCMD_DEBUG" \
+                "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat -no_logo -vcvars_ver="$VSDEV_VCVARSVER" -winsdk="$VSDEV_WINSDKVER" \
+                "$@" >&2
+        }
+    else
+        autodetect_compiler_vsdev_dump_vars_helper() {
+            "$DKMLSYS_ENV" PATH="$autodetect_compiler_vsdev_SYSTEMPATHUNIX" __VSCMD_ARG_NO_LOGO=1 VSCMD_SKIP_SENDTELEMETRY=1 VSCMD_DEBUG="$autodetect_compiler_VSCMD_DEBUG" \
+                "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat -no_logo \
+                "$@" >&2
+        }
+    fi
     if [ "$BUILDHOST_ARCH" = windows_x86 ]; then
         # The build host machine is 32-bit ...
         if [ "$autodetect_compiler_PLATFORM_ARCH" = dev ] || [ "$autodetect_compiler_PLATFORM_ARCH" = windows_x86 ]; then
@@ -2643,8 +2658,16 @@ autodetect_compiler_vsdev() {
         echo "FATAL: The Visual Studio installation \"$autodetect_compiler_vsdev_INSTALLDIR_BUILDHOST\" did not place '$autodetect_compiler_vsdev_VALIDATE_ASM' in its PATH." >&2
         echo "       It should be present for the target ABI $autodetect_compiler_PLATFORM_ARCH ($autodetect_compiler_TGTARCH) on a build host $BUILDHOST_ARCH." >&2
         echo "  Fix? Run the Visual Studio Installer and then:" >&2
-        echo "       1. Make sure you have the MSVC v$VSDEV_VCVARSVER $autodetect_compiler_TGTARCH Build Tools component." >&2
-        echo "       2. Also make sure you have the Windows SDK $VSDEV_WINSDKVER component." >&2
+        if [ -n "${VSDEV_VCVARSVER:-}" ]; then
+        echo "       1. Make sure you have the MSVC v${VSDEV_VCVARSVER:-} $autodetect_compiler_TGTARCH Build Tools component." >&2
+        else
+        echo "       1. Make sure you have the MSVC v142 (or later) $autodetect_compiler_TGTARCH Build Tools component." >&2
+        fi
+        if [ -n "${VSDEV_WINSDKVER:-}" ]; then
+        echo "       2. Also make sure you have the Windows SDK ${VSDEV_WINSDKVER:-} component." >&2
+        else
+        echo "       2. Also make sure you have the Windows SDK 10.0.18362.0 (or later) component." >&2
+        fi
         exit 107
     fi
 
@@ -2740,6 +2763,12 @@ autodetect_compiler_vsdev() {
     BEGIN{FS="="} $1 == "LIB" {name=$1; value=$0; sub(/^[^=]*=/,"",value);     print value}
     ' "$autodetect_compiler_TEMPDIR"/vcvars.txt)
 
+    # === autodetect_compiler_vsdev_VSCMD_VER
+    # shellcheck disable=SC2016
+    "$DKMLSYS_AWK" '
+    BEGIN{FS="="} $1 == "VSCMD_VER" {name=$1; value=$0; sub(/^[^=]*=/,"",value);    print value}
+    ' "$autodetect_compiler_TEMPDIR"/vcvars.txt > "$autodetect_compiler_TEMPDIR"/VSCMD_VER.txt
+
     # EIGHTH, make the launcher script or s-exp
     if [ "$autodetect_compiler_OUTPUTMODE" = SEXP ]; then
         autodetect_compiler_escape() {
@@ -2761,19 +2790,30 @@ autodetect_compiler_vsdev() {
         done
 
         # Add MSVS_PREFERENCE
+        autodetect_compiler_vsdev_VSCMD_VER=$(cat "$autodetect_compiler_TEMPDIR"/VSCMD_VER.txt)
+        autodetect_compiler_vsdev_MSVS_PREFERENCE=$(vscmd_ver_to_vsstudio_msvspreference "$autodetect_compiler_vsdev_VSCMD_VER")
         if [ "$autodetect_compiler_OUTPUTMODE" = SEXP ]; then
-            printf "%s\n" "  (\"MSVS_PREFERENCE\" \"$VSDEV_MSVSPREFERENCE\")"
+            printf "%s\n" "  (\"MSVS_PREFERENCE\" \"$autodetect_compiler_vsdev_MSVS_PREFERENCE\")"
         elif [ "$autodetect_compiler_OUTPUTMODE" = LAUNCHER ]; then
-            printf "%s\n" "  MSVS_PREFERENCE='$VSDEV_MSVSPREFERENCE' \\"
+            printf "%s\n" "  MSVS_PREFERENCE='$autodetect_compiler_vsdev_MSVS_PREFERENCE' \\"
         fi
 
         # Add CMAKE_GENERATOR_RECOMMENDED and CMAKE_GENERATOR_INSTANCE_RECOMMENDED
+        case "$autodetect_compiler_vsdev_VSCMD_VER" in
+            16.*) autodetect_compiler_vsdev_CMAKEGENERATOR="Visual Studio 16 2019" ;;
+            17.*) autodetect_compiler_vsdev_CMAKEGENERATOR="Visual Studio 17 2022";;
+            *)
+                echo "FATAL: The Visual Studio installation \"$autodetect_compiler_vsdev_INSTALLDIR_BUILDHOST\" has a version" >&2
+                echo "       $autodetect_compiler_vsdev_VSCMD_VER not supported by DkML." >&2
+                echo "  Fix? Use Visual Studio 2019 or Visual Studio 2022." >&2
+                exit 107
+        esac
         if [ "$autodetect_compiler_OUTPUTMODE" = SEXP ]; then
             autodetect_compiler_VSDEV_HOME_BUILDHOST_QUOTED=$(printf "%s" "$autodetect_compiler_vsdev_INSTALLDIR_BUILDHOST" | autodetect_compiler_escape_sexp)
-            printf "%s\n" "  (\"CMAKE_GENERATOR_RECOMMENDED\" \"$VSDEV_CMAKEGENERATOR\")"
+            printf "%s\n" "  (\"CMAKE_GENERATOR_RECOMMENDED\" \"$autodetect_compiler_vsdev_CMAKEGENERATOR\")"
             printf "%s\n" "  (\"CMAKE_GENERATOR_INSTANCE_RECOMMENDED\" \"$autodetect_compiler_VSDEV_HOME_BUILDHOST_QUOTED\")"
         elif [ "$autodetect_compiler_OUTPUTMODE" = LAUNCHER ]; then
-            printf "%s\n" "  CMAKE_GENERATOR_RECOMMENDED='$VSDEV_CMAKEGENERATOR' \\"
+            printf "%s\n" "  CMAKE_GENERATOR_RECOMMENDED='$autodetect_compiler_vsdev_CMAKEGENERATOR' \\"
             printf "%s\n" "  CMAKE_GENERATOR_INSTANCE_RECOMMENDED='$autodetect_compiler_vsdev_INSTALLDIR_BUILDHOST' \\"
         fi
 

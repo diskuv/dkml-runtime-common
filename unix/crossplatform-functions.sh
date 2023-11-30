@@ -2332,6 +2332,7 @@ autodetect_compiler_system() {
                 -property installationPath \
                 -latest || true)
             if [ -n "$autodetect_compiler_system_COMPATIBLE_INSTALLDIR" ]; then
+                autodetect_compiler_system_COMPATIBLE_INSTALLDIR=$(printf "%s" "$autodetect_compiler_system_COMPATIBLE_INSTALLDIR" | "$DKMLSYS_AWK" 'BEGIN{RS="\r\n"} {print; exit}')
                 autodetect_compiler_vsdev "$autodetect_compiler_system_COMPATIBLE_INSTALLDIR"
                 return # done. [autodetect_compiler_vsdev] wrote the compiler variables
             fi

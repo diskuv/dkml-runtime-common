@@ -3203,18 +3203,23 @@ system_powershell() {
     PATH="$DKML_SYSTEM_PATH" log_trace "$DKML_SYSTEM_POWERSHELL" "$@"
 }
 
+# Always prefers bin/ocaml (install-time native code binaries)
+# over usr/bin/ocaml (precompiled "global-compile" shims). That way
+# native code tools like ocamlopt and ocamlmklib are available
+# in opam switches; with [ocaml-system] the directory containing the
+# ocamlc executable is added to the PATH with a PATH+= construct.
 validate_and_explore_ocamlhome() {
     validate_and_explore_ocamlhome_HOME=$1
     shift
     # Set DKML_OCAMLHOME_BINDIR_UNIX. Validate
-    if [ -x "$validate_and_explore_ocamlhome_HOME/usr/bin/ocaml" ] || [ -x "$validate_and_explore_ocamlhome_HOME/usr/bin/ocaml.exe" ]; then
-        DKML_OCAMLHOME_BINDIR_UNIX=usr/bin
-    elif [ -x "$validate_and_explore_ocamlhome_HOME/bin/ocaml" ] || [ -x "$validate_and_explore_ocamlhome_HOME/bin/ocaml.exe" ]; then
+    if [ -x "$validate_and_explore_ocamlhome_HOME/bin/ocaml" ] || [ -x "$validate_and_explore_ocamlhome_HOME/bin/ocaml.exe" ]; then
         # shellcheck disable=SC2034
         DKML_OCAMLHOME_BINDIR_UNIX=bin
+    elif [ -x "$validate_and_explore_ocamlhome_HOME/usr/bin/ocaml" ] || [ -x "$validate_and_explore_ocamlhome_HOME/usr/bin/ocaml.exe" ]; then
+        DKML_OCAMLHOME_BINDIR_UNIX=usr/bin
     else
         unset DKML_OCAMLHOME_BINDIR_UNIX
-        printf "FATAL: The OCAMLHOME='%s' does not have a usr/bin/ocaml, bin/ocaml, usr/bin/ocaml.exe or bin/ocaml.exe\n" "$validate_and_explore_ocamlhome_HOME" >&2
+        printf "FATAL: The OCAMLHOME='%s' does not have a bin/ocaml, usr/bin/ocaml, bin/ocaml.exe or usr/bin/ocaml.exe\n" "$validate_and_explore_ocamlhome_HOME" >&2
         exit 107
     fi
     # Set DKML_OCAMLHOME_UNIX and DKML_OCAMLHOME_ABSBINDIR_BUILDHOST

@@ -267,14 +267,16 @@ set_opamrootdir() {
             if [ -z "$OPAMROOTDIR_BUILDHOST" ]; then
                 # Opam is not initialized. We probably got:
                 #   [ERROR] Opam has not been initialised, please run `opam init'
-                # So conform to https://github.com/ocaml/opam/pull/4815#issuecomment-910137754
+                # So conform to https://github.com/ocaml/opam/issues/3766 with an
+                # opam root change intended for opam 2.3.
+                # CHANGE NOTICE: Also change dkml-runtime-apps's [opam_context.ml]
                 set_opamrootdir_VER=$($OPAMEXE --version)
                 case "$set_opamrootdir_VER" in
                     1*)
                         printf "FATAL: You will need to upgrade %s to Opam 2.0+\n" "$OPAMEXE"
                         exit 107
                         ;;
-                    2.0.*|2.1.*)
+                    2.0.*|2.1.*|2.2.*)
                         OPAMROOTDIR_BUILDHOST="$HOME/.opam"
                         ;;
                     *)

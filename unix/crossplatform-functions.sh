@@ -112,6 +112,7 @@ set_default_dkmlnativedir() {
 # - env:DiskuvOCamlDeploymentId - optional
 # - env:DiskuvOCamlVersion - optional
 # - env:DiskuvOCamlMSYS2Dir - optional
+# - env:DiskuvOCamlForceDefaults - optional. if nonzero (defaults to 0) then uses defaults for DkML even if installed.
 # Outputs:
 # - env:DKMLPARENTHOME_BUILDHOST
 # - env:DKMLVERSION - set if DkML installed. The installed version number
@@ -121,7 +122,7 @@ set_default_dkmlnativedir() {
 # - env:DKMLBINPATHS_UNIX - set if DkML installed. Paths will be in Unix (colon separated) format
 # - env:DKMLMSYS2DIR_BUILDHOST - set if DkML installed MSYS2. Directory will be in Windows format
 # Return Code:
-# - 1 if DkML is not installed
+# - 1 if the installed or overridden DkML is misconfigured. 0 if defaults were used or installed/overridden DkML is valid.
 default_dkmlvars() {
     set_default_dkmlnativedir # Native is the default mode, not Bytecode
     autodetect_dkmlvars_DiskuvOCamlVarsVersion_Override=2
@@ -142,6 +143,7 @@ autodetect_dkmlvars() {
     autodetect_dkmlvars_DiskuvOCamlDeploymentId_Override=${DiskuvOCamlDeploymentId:-}
     autodetect_dkmlvars_DiskuvOCamlVersion_Override=${DiskuvOCamlVersion:-}
     autodetect_dkmlvars_DiskuvOCamlMSYS2Dir_Override=${DiskuvOCamlMSYS2Dir:-}
+    autodetect_dkmlvars_DiskuvOCaml_ForceDefaults=${DiskuvOCamlForceDefaults:-0}
 
     set_dkmlparenthomedir
 
@@ -154,7 +156,7 @@ autodetect_dkmlvars() {
     DKMLMSYS2DIR_BUILDHOST=
 
     if is_unixy_windows_build_machine; then
-        if [ -e "$DKMLPARENTHOME_BUILDHOST\\dkmlvars.sh" ]; then
+        if [ "${autodetect_dkmlvars_DiskuvOCaml_ForceDefaults:-}" = "0" ] && [ -e "$DKMLPARENTHOME_BUILDHOST\\dkmlvars.sh" ]; then
             if [ -x /usr/bin/cygpath ]; then
                 autodetect_dkmlvars_VARSSCRIPT=$(/usr/bin/cygpath -a "$DKMLPARENTHOME_BUILDHOST\\dkmlvars.sh")
                 # shellcheck disable=SC1090
@@ -167,7 +169,7 @@ autodetect_dkmlvars() {
             default_dkmlvars
         fi
     else
-        if [ -e "$DKMLPARENTHOME_BUILDHOST/dkmlvars.sh" ]; then
+        if [ "${autodetect_dkmlvars_DiskuvOCaml_ForceDefaults:-}" = "0" ] && [ -e "$DKMLPARENTHOME_BUILDHOST/dkmlvars.sh" ]; then
             # shellcheck disable=SC1091
             . "$DKMLPARENTHOME_BUILDHOST/dkmlvars.sh"
         else

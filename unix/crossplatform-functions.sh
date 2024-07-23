@@ -1498,6 +1498,8 @@ cmake_flag_notfound() {
 #     - env:DKML_COMPILE_CM_CMAKE_STRIP
 #     - env:DKML_COMPILE_CM_CMAKE_LIBRARY_ARCHITECTURE
 #     - env:DKML_COMPILE_CM_MSVC - The CMake variable MSVC
+#     - env:DKML_COMPILE_CM_MSVC_INCLUDE - The MSVC system include directories semicolon-seperated path, which is the value of INCLUDE that would be set by vcvarsall.bat
+#     - env:DKML_COMPILE_CM_MSVC_LIB - The MSVC system library directories semicolon-seperated path, which is the value of LIB that would be set by vcvarsall.bat
 #   - If no DKML_COMPILE_SPEC or no DKML_COMPILE_TYPE above ...
 #     | Machine = Darwin |
 #     - env:DKML_COMPILE_DARWIN_OSX_DEPLOYMENT_TARGET - The minimum version of the target
@@ -2293,8 +2295,9 @@ autodetect_compiler_cmake() {
     autodetect_compiler_LDFLAGS="$autodetect_compiler_cmake_Specific_LDFLAGS"
     autodetect_compiler_LDLIBS="${DKML_COMPILE_CM_CMAKE_C_STANDARD_LIBRARIES:-}"
     autodetect_compiler_MSVS_NAME="CMake ${DKML_COMPILE_CM_CMAKE_C_COMPILER_ID:-C} compiler${DKML_COMPILE_CM_CMAKE_C_COMPILER:+ at $DKML_COMPILE_CM_CMAKE_C_COMPILER}"
-    autodetect_compiler_MSVS_INC="${DKML_COMPILE_CM_CMAKE_C_STANDARD_INCLUDE_DIRECTORIES:-}"
-    autodetect_compiler_MSVS_LIB= # CMake has no variables to populate this
+    #   CMake has no variables to populate these two (CMAKE_C_STANDARD_INCLUDE_DIRECTORIES is empty for MSVC), but we can use inferred variables CM_MSVC_INCLUDE/LIB.
+    autodetect_compiler_MSVS_INC="${DKML_COMPILE_CM_MSVC_INCLUDE:-}"
+    autodetect_compiler_MSVS_LIB="${DKML_COMPILE_CM_MSVC_LIB:-}"
     autodetect_compiler_MSVS_PATH=
     autodetect_compiler_add_parent_to_msvs_path() {
         autodetect_compiler_add_parent_to_msvs_path_VAL=$1

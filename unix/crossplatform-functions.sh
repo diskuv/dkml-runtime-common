@@ -1029,58 +1029,65 @@ install_reproducible_script_with_args() {
 
 # Tries to find the host ABI.
 #
-# Beware: This function uses `uname` probing which is inaccurate during
-# cross-compilation.
+# Beware: This function uses `uname` probing may be inaccurate for dual-arch
+# CPUs like Apple Silicon with Rosetta.
+#
+# Inputs:
+# - env:DKML_HOST_ABI - Optional but recommended. If set, then BUILDHOST_ARCH will be set to the same.
 #
 # Outputs:
 # - env:BUILDHOST_ARCH will contain the host ABI.
 autodetect_buildhost_arch() {
-    # Set DKMLSYS_*
-    autodetect_system_binaries
+    if [ -n "${DKML_HOST_ABI:-}" ]; then
+        BUILDHOST_ARCH=$DKML_HOST_ABI
+    else
+        # Set DKMLSYS_*
+        autodetect_system_binaries
 
-    autodetect_buildhost_arch_SYSTEM=$("$DKMLSYS_UNAME" -s)
-    autodetect_buildhost_arch_MACHINE=$("$DKMLSYS_UNAME" -m)
-    # list from https://en.wikipedia.org/wiki/Uname and https://stackoverflow.com/questions/45125516/possible-values-for-uname-m
-    case "${autodetect_buildhost_arch_SYSTEM}-${autodetect_buildhost_arch_MACHINE}" in
-        Linux-armv7*)
-            BUILDHOST_ARCH=linux_arm32v7;;
-        Linux-armv6* | Linux-arm)
-            BUILDHOST_ARCH=linux_arm32v6;;
-        Linux-aarch64 | Linux-arm64 | Linux-armv8*)
-            BUILDHOST_ARCH=linux_arm64;;
-        Linux-i386 | Linux-i686)
-            BUILDHOST_ARCH=linux_x86;;
-        Linux-x86_64)
-            BUILDHOST_ARCH=linux_x86_64;;
-        Darwin-arm64)
-            BUILDHOST_ARCH=darwin_arm64;;
-        Darwin-x86_64)
-            BUILDHOST_ARCH=darwin_x86_64;;
-        *-i386 | *-i686)
-            if is_unixy_windows_build_machine; then
-                BUILDHOST_ARCH=windows_x86
-            else
+        autodetect_buildhost_arch_SYSTEM=$("$DKMLSYS_UNAME" -s)
+        autodetect_buildhost_arch_MACHINE=$("$DKMLSYS_UNAME" -m)
+        # list from https://en.wikipedia.org/wiki/Uname and https://stackoverflow.com/questions/45125516/possible-values-for-uname-m
+        case "${autodetect_buildhost_arch_SYSTEM}-${autodetect_buildhost_arch_MACHINE}" in
+            Linux-armv7*)
+                BUILDHOST_ARCH=linux_arm32v7;;
+            Linux-armv6* | Linux-arm)
+                BUILDHOST_ARCH=linux_arm32v6;;
+            Linux-aarch64 | Linux-arm64 | Linux-armv8*)
+                BUILDHOST_ARCH=linux_arm64;;
+            Linux-i386 | Linux-i686)
+                BUILDHOST_ARCH=linux_x86;;
+            Linux-x86_64)
+                BUILDHOST_ARCH=linux_x86_64;;
+            Darwin-arm64)
+                BUILDHOST_ARCH=darwin_arm64;;
+            Darwin-x86_64)
+                BUILDHOST_ARCH=darwin_x86_64;;
+            *-i386 | *-i686)
+                if is_unixy_windows_build_machine; then
+                    BUILDHOST_ARCH=windows_x86
+                else
+                    printf "%s\n" "FATAL: Unsupported build machine type obtained from 'uname -s' and 'uname -m': $autodetect_buildhost_arch_SYSTEM and $autodetect_buildhost_arch_MACHINE" >&2
+                    exit 1
+                fi
+                ;;
+            *-x86_64)
+                if is_unixy_windows_build_machine; then
+                    BUILDHOST_ARCH=windows_x86_64
+                else
+                    printf "%s\n" "FATAL: Unsupported build machine type obtained from 'uname -s' and 'uname -m': $autodetect_buildhost_arch_SYSTEM and $autodetect_buildhost_arch_MACHINE" >&2
+                    exit 1
+                fi
+                ;;
+            *)
+                # Since:
+                # 1) MSYS2 does not run on ARM/ARM64 (https://www.msys2.org/docs/environments/)
+                # 2) MSVC does not use ARM/ARM64 as host machine (https://docs.microsoft.com/en-us/cpp/build/building-on-the-command-line?view=msvc-160)
+                # we do not support Windows ARM/ARM64 as a build machine
                 printf "%s\n" "FATAL: Unsupported build machine type obtained from 'uname -s' and 'uname -m': $autodetect_buildhost_arch_SYSTEM and $autodetect_buildhost_arch_MACHINE" >&2
                 exit 1
-            fi
-            ;;
-        *-x86_64)
-            if is_unixy_windows_build_machine; then
-                BUILDHOST_ARCH=windows_x86_64
-            else
-                printf "%s\n" "FATAL: Unsupported build machine type obtained from 'uname -s' and 'uname -m': $autodetect_buildhost_arch_SYSTEM and $autodetect_buildhost_arch_MACHINE" >&2
-                exit 1
-            fi
-            ;;
-        *)
-            # Since:
-            # 1) MSYS2 does not run on ARM/ARM64 (https://www.msys2.org/docs/environments/)
-            # 2) MSVC does not use ARM/ARM64 as host machine (https://docs.microsoft.com/en-us/cpp/build/building-on-the-command-line?view=msvc-160)
-            # we do not support Windows ARM/ARM64 as a build machine
-            printf "%s\n" "FATAL: Unsupported build machine type obtained from 'uname -s' and 'uname -m': $autodetect_buildhost_arch_SYSTEM and $autodetect_buildhost_arch_MACHINE" >&2
-            exit 1
-            ;;
-    esac
+                ;;
+        esac
+    fi
 }
 
 # Fix the MSYS2 ambiguity problem described at https://github.com/msys2/MSYS2-packages/issues/2316. Our error is running:
@@ -1407,7 +1414,9 @@ cmake_flag_notfound() {
 # - env:DKML_COMPILE_SPEC - Optional. If specified will be a specification number, which determines which
 #   other environment variables have to be supplied and the format of each variable.
 #   Only spec 1 is supported today:
-#   - env:DKML_COMPILE_TYPE - "SYS" for the system which compiles for the host ABI.
+#   - env:DKML_COMPILE_TYPE - "SYS" for the system compiler compiling to the host ABI. If
+#       DKML_TARGET_ABI is set, the system compiler will be set to the target ABI.
+#   - env:DKML_TARGET_ABI - Optional but recommended when DKML_COMPILE_TYPE=SYS
 #   - env:DKML_COMPILE_TYPE - "VS" for Visual Studio. The following vars must be defined:
 #     - env:DKML_COMPILE_VS_DIR - The
 #       specified installation directory of Visual Studio will be used.
@@ -1507,7 +1516,7 @@ cmake_flag_notfound() {
 #       Populates -mmacosx-version-min=MM.NN in clang.
 # Outputs:
 # - env:DKMLPARENTHOME_BUILDHOST
-# - env:BUILDHOST_ARCH will contain the correct ARCH
+# - env:BUILDHOST_ARCH will contain the detected DkML ABI for the host. If DKML_HOST_ABI was set, BUILDHOST_ARCH will be the same.
 # - env:DKML_SYSTEM_PATH
 # - env:OCAML_HOST_TRIPLET is non-empty if `--host OCAML_HOST_TRIPLET` should be passed to OCaml's ./configure script when
 #   compiling OCaml. Aligns with the PLATFORM variable that was specified, especially for cross-compilation.

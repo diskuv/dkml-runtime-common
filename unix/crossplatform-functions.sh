@@ -3025,7 +3025,7 @@ sha256check() {
         # On Debian shasum is a perl script, and perl needs locale settings or it will complain.
         # Confer: https://www.thomas-krenn.com/en/wiki/Perl_warning_Setting_locale_failed_in_Debian
         # Confer: https://stackoverflow.com/a/52004330/21513816
-        # Note: shasum 5.96 (ex. conanio/gcc7:1.64.1) has no --version option.
+        # Note: shasum 5.96 (ex. conanio/gcc7:1.64.1) has no --quiet option.
         #   shellcheck disable=SC2016
         printf "%s  %s" "$sha256check_SUM" "$sha256check_FILE" | LC_ALL=C /usr/bin/shasum -a 256 -c >&2
     elif [ -x /usr/bin/sha256sum ]; then # Linux, MSYS2

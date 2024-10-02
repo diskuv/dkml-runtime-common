@@ -2999,7 +2999,7 @@ sha256compute() {
         # Confer: https://www.thomas-krenn.com/en/wiki/Perl_warning_Setting_locale_failed_in_Debian
         # Confer: https://stackoverflow.com/a/52004330/21513816           
         #   shellcheck disable=SC2016
-        LANG=C.UTF-8 LC_ALL=C.UTF-8 /usr/bin/shasum -a 256 "$sha256compute_FILE" | "$DKMLSYS_AWK" '{print $1}'
+        LC_ALL=C /usr/bin/shasum -a 256 "$sha256compute_FILE" | "$DKMLSYS_AWK" '{print $1}'
     elif [ -x /usr/bin/sha256sum ]; then # Linux, MSYS2
         #   shellcheck disable=SC2016
         /usr/bin/sha256sum "$sha256compute_FILE" | "$DKMLSYS_AWK" '{print $1}'
@@ -3024,9 +3024,10 @@ sha256check() {
         # CODESITE #1 (duplicates elsewhere).
         # On Debian shasum is a perl script, and perl needs locale settings or it will complain.
         # Confer: https://www.thomas-krenn.com/en/wiki/Perl_warning_Setting_locale_failed_in_Debian
-        # Confer: https://stackoverflow.com/a/52004330/21513816           
-        #   shellcheck disable=SC2016        
-        printf "%s  %s" "$sha256check_SUM" "$sha256check_FILE" | LANG=C.UTF-8 LC_ALL=C.UTF-8 /usr/bin/shasum -a 256 -c >&2
+        # Confer: https://stackoverflow.com/a/52004330/21513816
+        # Note: shasum 5.96 (ex. conanio/gcc7:1.64.1) has no --version option.
+        #   shellcheck disable=SC2016
+        printf "%s  %s" "$sha256check_SUM" "$sha256check_FILE" | LC_ALL=C /usr/bin/shasum -a 256 -c >&2
     elif [ -x /usr/bin/sha256sum ]; then # Linux, MSYS2
         printf "%s  %s" "$sha256check_SUM" "$sha256check_FILE" | /usr/bin/sha256sum -c >&2
     elif [ -x /sbin/sha256 ]; then # FreeBSD

@@ -135,7 +135,7 @@ exec_in_platform() {
     if [ -n "${PLATFORM_EXEC_PRE_DOUBLE:-}" ]; then
         ACTUAL_PRE_HOOK_DOUBLE="$PLATFORM_EXEC_PRE_DOUBLE"
     fi
-    printf "%s\n" "exec '$DKMLDIR'/vendor/drc/unix/_within_dev.sh -p '$_exec_dev_or_arch_helper_DKMLPLATFORM' -0 '${ACTUAL_PRE_HOOK_SINGLE:-}' -1 '${ACTUAL_PRE_HOOK_DOUBLE:-}' \\" > "$_exec_dev_or_arch_helper_CMDFILE"
+    printf "%s\n" "exec bash '$DKMLDIR'/vendor/drc/unix/_within_dev.sh -p '$_exec_dev_or_arch_helper_DKMLPLATFORM' -0 '${ACTUAL_PRE_HOOK_SINGLE:-}' -1 '${ACTUAL_PRE_HOOK_DOUBLE:-}' \\" > "$_exec_dev_or_arch_helper_CMDFILE"
 
     cat "$_exec_dev_or_arch_helper_CMDARGS" >> "$_exec_dev_or_arch_helper_CMDFILE"
 

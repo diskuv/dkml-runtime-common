@@ -2597,6 +2597,7 @@ autodetect_compiler_vsdev() {
     #   standardized and will be set and transformed later based on this output)
     # - MSVS_NAME,MSVS_PATH,MSVS_INC,MSVS_LIB,MSVS_ML (also standardized)
     # - _
+    # - -* (these interfere when passed to /usr/bin/env since they are treated as options)
     # - !ExitCode
     # - TEMP, TMP
     # - PWD
@@ -2636,7 +2637,7 @@ autodetect_compiler_vsdev() {
     $1 != "MSVS_LIB" &&
     $1 != "MSVS_ML" &&
     $1 !~ /^!ExitCode/ &&
-    $1 !~ /^_$/ && $1 != "TEMP" && $1 != "TMP" && $1 != "PWD" &&
+    $1 !~ /^_$/ && $1 !~ /^-/ && $1 != "TEMP" && $1 != "TMP" && $1 != "PWD" &&
     $1 != "PROMPT" && $1 !~ /^LOGON/ && $1 !~ /APPDATA$/ &&
     $1 != "ALLUSERSPROFILE" && $1 != "CYGWIN" && $1 != "CYGPATH" &&
     $1 !~ /^CI_/ && $1 !~ /_DEPLOY_TOKEN$/ && $1 !~ /^PG/ &&

@@ -2468,9 +2468,12 @@ autodetect_compiler_vsdev() {
     } > "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat
     #   +x for Cygwin (not needed for MSYS2)
     $DKMLSYS_CHMOD +x "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat
-    if [ "${DKML_BUILD_TRACE:-OFF}" = ON ] && [ "${DKML_BUILD_TRACE_LEVEL:-0}" -ge 2 ]; then
+    autodetect_compiler_vsdev_dump_script() {
         printf "@+: %s/vsdevcmd-and-printenv.bat\n" "$autodetect_compiler_TEMPDIR" >&2
         "$DKMLSYS_SED" 's/^/@+| /' "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat | "$DKMLSYS_AWK" '{print}' >&2
+    }
+    if [ "${DKML_BUILD_TRACE:-OFF}" = ON ] && [ "${DKML_BUILD_TRACE_LEVEL:-0}" -ge 2 ]; then
+        autodetect_compiler_vsdev_dump_script
     fi
 
     # SECOND, construct a function that will call Microsoft's vsdevcmd.bat script.
@@ -2498,15 +2501,33 @@ autodetect_compiler_vsdev() {
     #    2023 so ARMv7 should be fine.
     if [ -n "${VSDEV_VCVARSVER:-}" ] && [ -n "${VSDEV_WINSDKVER}" ]; then
         autodetect_compiler_vsdev_dump_vars_helper() {
+            rm -f "$autodetect_compiler_TEMPDIR"/vcvars.txt
             "$DKMLSYS_ENV" PATH="$autodetect_compiler_vsdev_SYSTEMPATHUNIX" __VSCMD_ARG_NO_LOGO=1 VSCMD_SKIP_SENDTELEMETRY=1 VSCMD_DEBUG="$autodetect_compiler_VSCMD_DEBUG" \
-                "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat -no_logo -vcvars_ver="$VSDEV_VCVARSVER" -winsdk="$VSDEV_WINSDKVER" \
-                "$@" >&2
+                "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat \
+                -no_logo -vcvars_ver="$VSDEV_VCVARSVER" -winsdk="$VSDEV_WINSDKVER" "$@" >&2
+            if [ ! -e "$autodetect_compiler_TEMPDIR"/vcvars.txt ]; then 
+                autodetect_compiler_vsdev_dump_script
+                echo >&2
+                echo "FAILED: $autodetect_compiler_vsdev_INSTALLDIR_BUILDHOST/Common7/Tools/VsDevCmd.bat -no_logo -vcvars_ver=$VSDEV_VCVARSVER -winsdk=$VSDEV_WINSDKVER $*" >&2
+                set | "$DKMLSYS_GREP" "^DKML_COMPILE_" >&2
+                echo "DKMLPARENTHOME_BUILDHOST=${DKMLPARENTHOME_BUILDHOST:-}" >&2
+                exit 107
+            fi
         }
     else
         autodetect_compiler_vsdev_dump_vars_helper() {
+            rm -f "$autodetect_compiler_TEMPDIR"/vcvars.txt
             "$DKMLSYS_ENV" PATH="$autodetect_compiler_vsdev_SYSTEMPATHUNIX" __VSCMD_ARG_NO_LOGO=1 VSCMD_SKIP_SENDTELEMETRY=1 VSCMD_DEBUG="$autodetect_compiler_VSCMD_DEBUG" \
-                "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat -no_logo \
-                "$@" >&2
+                "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat \
+                -no_logo "$@" >&2
+            if [ ! -e "$autodetect_compiler_TEMPDIR"/vcvars.txt ]; then 
+                autodetect_compiler_vsdev_dump_script
+                echo >&2
+                echo "FAILED: $autodetect_compiler_vsdev_INSTALLDIR_BUILDHOST/Common7/Tools/VsDevCmd.bat -no_logo $*" >&2
+                set | "$DKMLSYS_GREP" "^DKML_COMPILE_" >&2
+                echo "DKMLPARENTHOME_BUILDHOST=${DKMLPARENTHOME_BUILDHOST:-}" >&2
+                exit 107
+            fi
         }
     fi
     if [ "$BUILDHOST_ARCH" = windows_x86 ]; then

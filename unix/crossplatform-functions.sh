@@ -1203,6 +1203,8 @@ vscmd_ver_to_vsstudio_msvspreference() {
 # - env:VSCMD_VER - Optional.
 # - env:VisualStudioVersion - Optional.
 #
+# ... If DKML_SKIP_DKML_INSTALLTIME_VSDEV set to "1" then returns 1 (ie. no DkML installation)
+#
 # ... Otherwise configuration from $env:DiskuvOCamlHome/vsstudio.* is used.
 # Outputs:
 # - env:DKMLPARENTHOME_BUILDHOST
@@ -1260,6 +1262,8 @@ autodetect_vsdev() {
           printf "ERROR: VisualStudioVersion=%s is not handled by autodetect_vsdev of crossplatform-functions.sh\n" "$VisualStudioVersion" >&2
           return 1
         esac
+    elif [ "${DKML_SKIP_DKML_INSTALLTIME_VSDEV:-}" = 1 ]; then
+        return 1
     else
         autodetect_vsdev_VSSTUDIO_DIRFILE="$DKMLPARENTHOME_BUILDHOST/vsstudio.dir.txt"
         if [ ! -e "$autodetect_vsdev_VSSTUDIO_DIRFILE" ]; then return 1; fi

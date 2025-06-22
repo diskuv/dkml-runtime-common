@@ -2455,13 +2455,14 @@ autodetect_compiler_vsdev() {
         autodetect_compiler_VSDEVCMDFILE_WIN="$autodetect_compiler_vsdev_VSDEVCMD"
     fi
     {
-        printf "@set TEMP=%s\n" "$autodetect_compiler_TEMPDIR_DOS"
-        printf "@call %s%s%s %s\n" '"' "$autodetect_compiler_VSDEVCMDFILE_WIN" '"' '%*'
-        printf "%s\n" 'if %ERRORLEVEL% neq 0 ('
+        printf "@SET TEMP=%s\n" "$autodetect_compiler_TEMPDIR_DOS"
+        printf "@CALL %s%s%s %s\n" '"' "$autodetect_compiler_VSDEVCMDFILE_WIN" '"' '%*'
+        printf "%s\n" '@SET _VSERR=%ERRORLEVEL%'
+        printf "%s\n" 'if %_VSERR% neq 0 ('
         printf "%s\n" 'echo.'
         printf "%s\n" 'echo.FATAL: VsDevCmd.bat failed to find a Visual Studio compiler.'
         printf "%s\n" 'echo.'
-        printf "%s\n" 'exit /b %ERRORLEVEL%'
+        printf "%s\n" 'exit /b %_VSERR%'
         printf "%s\n" ')'
         printf "set > %s%s%s%s\n" '"' "$autodetect_compiler_TEMPDIR_WIN" '\vcvars.txt' '"'
     } > "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat

@@ -1029,58 +1029,65 @@ install_reproducible_script_with_args() {
 
 # Tries to find the host ABI.
 #
-# Beware: This function uses `uname` probing which is inaccurate during
-# cross-compilation.
+# Beware: This function uses `uname` probing may be inaccurate for dual-arch
+# CPUs like Apple Silicon with Rosetta.
+#
+# Inputs:
+# - env:DKML_HOST_ABI - Optional but recommended. If set, then BUILDHOST_ARCH will be set to the same.
 #
 # Outputs:
 # - env:BUILDHOST_ARCH will contain the host ABI.
 autodetect_buildhost_arch() {
-    # Set DKMLSYS_*
-    autodetect_system_binaries
+    if [ -n "${DKML_HOST_ABI:-}" ]; then
+        BUILDHOST_ARCH=$DKML_HOST_ABI
+    else
+        # Set DKMLSYS_*
+        autodetect_system_binaries
 
-    autodetect_buildhost_arch_SYSTEM=$("$DKMLSYS_UNAME" -s)
-    autodetect_buildhost_arch_MACHINE=$("$DKMLSYS_UNAME" -m)
-    # list from https://en.wikipedia.org/wiki/Uname and https://stackoverflow.com/questions/45125516/possible-values-for-uname-m
-    case "${autodetect_buildhost_arch_SYSTEM}-${autodetect_buildhost_arch_MACHINE}" in
-        Linux-armv7*)
-            BUILDHOST_ARCH=linux_arm32v7;;
-        Linux-armv6* | Linux-arm)
-            BUILDHOST_ARCH=linux_arm32v6;;
-        Linux-aarch64 | Linux-arm64 | Linux-armv8*)
-            BUILDHOST_ARCH=linux_arm64;;
-        Linux-i386 | Linux-i686)
-            BUILDHOST_ARCH=linux_x86;;
-        Linux-x86_64)
-            BUILDHOST_ARCH=linux_x86_64;;
-        Darwin-arm64)
-            BUILDHOST_ARCH=darwin_arm64;;
-        Darwin-x86_64)
-            BUILDHOST_ARCH=darwin_x86_64;;
-        *-i386 | *-i686)
-            if is_unixy_windows_build_machine; then
-                BUILDHOST_ARCH=windows_x86
-            else
+        autodetect_buildhost_arch_SYSTEM=$("$DKMLSYS_UNAME" -s)
+        autodetect_buildhost_arch_MACHINE=$("$DKMLSYS_UNAME" -m)
+        # list from https://en.wikipedia.org/wiki/Uname and https://stackoverflow.com/questions/45125516/possible-values-for-uname-m
+        case "${autodetect_buildhost_arch_SYSTEM}-${autodetect_buildhost_arch_MACHINE}" in
+            Linux-armv7*)
+                BUILDHOST_ARCH=linux_arm32v7;;
+            Linux-armv6* | Linux-arm)
+                BUILDHOST_ARCH=linux_arm32v6;;
+            Linux-aarch64 | Linux-arm64 | Linux-armv8*)
+                BUILDHOST_ARCH=linux_arm64;;
+            Linux-i386 | Linux-i686)
+                BUILDHOST_ARCH=linux_x86;;
+            Linux-x86_64)
+                BUILDHOST_ARCH=linux_x86_64;;
+            Darwin-arm64)
+                BUILDHOST_ARCH=darwin_arm64;;
+            Darwin-x86_64)
+                BUILDHOST_ARCH=darwin_x86_64;;
+            *-i386 | *-i686)
+                if is_unixy_windows_build_machine; then
+                    BUILDHOST_ARCH=windows_x86
+                else
+                    printf "%s\n" "FATAL: Unsupported build machine type obtained from 'uname -s' and 'uname -m': $autodetect_buildhost_arch_SYSTEM and $autodetect_buildhost_arch_MACHINE" >&2
+                    exit 1
+                fi
+                ;;
+            *-x86_64)
+                if is_unixy_windows_build_machine; then
+                    BUILDHOST_ARCH=windows_x86_64
+                else
+                    printf "%s\n" "FATAL: Unsupported build machine type obtained from 'uname -s' and 'uname -m': $autodetect_buildhost_arch_SYSTEM and $autodetect_buildhost_arch_MACHINE" >&2
+                    exit 1
+                fi
+                ;;
+            *)
+                # Since:
+                # 1) MSYS2 does not run on ARM/ARM64 (https://www.msys2.org/docs/environments/)
+                # 2) MSVC does not use ARM/ARM64 as host machine (https://docs.microsoft.com/en-us/cpp/build/building-on-the-command-line?view=msvc-160)
+                # we do not support Windows ARM/ARM64 as a build machine
                 printf "%s\n" "FATAL: Unsupported build machine type obtained from 'uname -s' and 'uname -m': $autodetect_buildhost_arch_SYSTEM and $autodetect_buildhost_arch_MACHINE" >&2
                 exit 1
-            fi
-            ;;
-        *-x86_64)
-            if is_unixy_windows_build_machine; then
-                BUILDHOST_ARCH=windows_x86_64
-            else
-                printf "%s\n" "FATAL: Unsupported build machine type obtained from 'uname -s' and 'uname -m': $autodetect_buildhost_arch_SYSTEM and $autodetect_buildhost_arch_MACHINE" >&2
-                exit 1
-            fi
-            ;;
-        *)
-            # Since:
-            # 1) MSYS2 does not run on ARM/ARM64 (https://www.msys2.org/docs/environments/)
-            # 2) MSVC does not use ARM/ARM64 as host machine (https://docs.microsoft.com/en-us/cpp/build/building-on-the-command-line?view=msvc-160)
-            # we do not support Windows ARM/ARM64 as a build machine
-            printf "%s\n" "FATAL: Unsupported build machine type obtained from 'uname -s' and 'uname -m': $autodetect_buildhost_arch_SYSTEM and $autodetect_buildhost_arch_MACHINE" >&2
-            exit 1
-            ;;
-    esac
+                ;;
+        esac
+    fi
 }
 
 # Fix the MSYS2 ambiguity problem described at https://github.com/msys2/MSYS2-packages/issues/2316. Our error is running:
@@ -1196,6 +1203,8 @@ vscmd_ver_to_vsstudio_msvspreference() {
 # - env:VSCMD_VER - Optional.
 # - env:VisualStudioVersion - Optional.
 #
+# ... If DKML_SKIP_DKML_INSTALLTIME_VSDEV set to "1" then returns 1 (ie. no DkML installation)
+#
 # ... Otherwise configuration from $env:DiskuvOCamlHome/vsstudio.* is used.
 # Outputs:
 # - env:DKMLPARENTHOME_BUILDHOST
@@ -1253,6 +1262,8 @@ autodetect_vsdev() {
           printf "ERROR: VisualStudioVersion=%s is not handled by autodetect_vsdev of crossplatform-functions.sh\n" "$VisualStudioVersion" >&2
           return 1
         esac
+    elif [ "${DKML_SKIP_DKML_INSTALLTIME_VSDEV:-}" = 1 ]; then
+        return 1
     else
         autodetect_vsdev_VSSTUDIO_DIRFILE="$DKMLPARENTHOME_BUILDHOST/vsstudio.dir.txt"
         if [ ! -e "$autodetect_vsdev_VSSTUDIO_DIRFILE" ]; then return 1; fi
@@ -1407,7 +1418,9 @@ cmake_flag_notfound() {
 # - env:DKML_COMPILE_SPEC - Optional. If specified will be a specification number, which determines which
 #   other environment variables have to be supplied and the format of each variable.
 #   Only spec 1 is supported today:
-#   - env:DKML_COMPILE_TYPE - "SYS" for the system which compiles for the host ABI.
+#   - env:DKML_COMPILE_TYPE - "SYS" for the system compiler compiling to the host ABI. If
+#       DKML_TARGET_ABI is set, the system compiler will be set to the target ABI.
+#   - env:DKML_TARGET_ABI - Optional but recommended when DKML_COMPILE_TYPE=SYS
 #   - env:DKML_COMPILE_TYPE - "VS" for Visual Studio. The following vars must be defined:
 #     - env:DKML_COMPILE_VS_DIR - The
 #       specified installation directory of Visual Studio will be used.
@@ -1507,7 +1520,7 @@ cmake_flag_notfound() {
 #       Populates -mmacosx-version-min=MM.NN in clang.
 # Outputs:
 # - env:DKMLPARENTHOME_BUILDHOST
-# - env:BUILDHOST_ARCH will contain the correct ARCH
+# - env:BUILDHOST_ARCH will contain the detected DkML ABI for the host. If DKML_HOST_ABI was set, BUILDHOST_ARCH will be the same.
 # - env:DKML_SYSTEM_PATH
 # - env:OCAML_HOST_TRIPLET is non-empty if `--host OCAML_HOST_TRIPLET` should be passed to OCaml's ./configure script when
 #   compiling OCaml. Aligns with the PLATFORM variable that was specified, especially for cross-compilation.
@@ -2448,21 +2461,25 @@ autodetect_compiler_vsdev() {
         autodetect_compiler_VSDEVCMDFILE_WIN="$autodetect_compiler_vsdev_VSDEVCMD"
     fi
     {
-        printf "@set TEMP=%s\n" "$autodetect_compiler_TEMPDIR_DOS"
-        printf "@call %s%s%s %s\n" '"' "$autodetect_compiler_VSDEVCMDFILE_WIN" '"' '%*'
-        printf "%s\n" 'if %ERRORLEVEL% neq 0 ('
+        printf "@SET TEMP=%s\n" "$autodetect_compiler_TEMPDIR_DOS"
+        printf "@CALL %s%s%s %s\n" '"' "$autodetect_compiler_VSDEVCMDFILE_WIN" '"' '%*'
+        printf "%s\n" '@SET _VSERR=%ERRORLEVEL%'
+        printf "%s\n" 'if %_VSERR% neq 0 ('
         printf "%s\n" 'echo.'
         printf "%s\n" 'echo.FATAL: VsDevCmd.bat failed to find a Visual Studio compiler.'
         printf "%s\n" 'echo.'
-        printf "%s\n" 'exit /b %ERRORLEVEL%'
+        printf "%s\n" 'exit /b %_VSERR%'
         printf "%s\n" ')'
         printf "set > %s%s%s%s\n" '"' "$autodetect_compiler_TEMPDIR_WIN" '\vcvars.txt' '"'
     } > "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat
     #   +x for Cygwin (not needed for MSYS2)
     $DKMLSYS_CHMOD +x "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat
-    if [ "${DKML_BUILD_TRACE:-OFF}" = ON ] && [ "${DKML_BUILD_TRACE_LEVEL:-0}" -ge 2 ]; then
+    autodetect_compiler_vsdev_dump_script() {
         printf "@+: %s/vsdevcmd-and-printenv.bat\n" "$autodetect_compiler_TEMPDIR" >&2
         "$DKMLSYS_SED" 's/^/@+| /' "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat | "$DKMLSYS_AWK" '{print}' >&2
+    }
+    if [ "${DKML_BUILD_TRACE:-OFF}" = ON ] && [ "${DKML_BUILD_TRACE_LEVEL:-0}" -ge 2 ]; then
+        autodetect_compiler_vsdev_dump_script
     fi
 
     # SECOND, construct a function that will call Microsoft's vsdevcmd.bat script.
@@ -2490,15 +2507,33 @@ autodetect_compiler_vsdev() {
     #    2023 so ARMv7 should be fine.
     if [ -n "${VSDEV_VCVARSVER:-}" ] && [ -n "${VSDEV_WINSDKVER}" ]; then
         autodetect_compiler_vsdev_dump_vars_helper() {
+            rm -f "$autodetect_compiler_TEMPDIR"/vcvars.txt
             "$DKMLSYS_ENV" PATH="$autodetect_compiler_vsdev_SYSTEMPATHUNIX" __VSCMD_ARG_NO_LOGO=1 VSCMD_SKIP_SENDTELEMETRY=1 VSCMD_DEBUG="$autodetect_compiler_VSCMD_DEBUG" \
-                "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat -no_logo -vcvars_ver="$VSDEV_VCVARSVER" -winsdk="$VSDEV_WINSDKVER" \
-                "$@" >&2
+                "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat \
+                -no_logo -vcvars_ver="$VSDEV_VCVARSVER" -winsdk="$VSDEV_WINSDKVER" "$@" >&2
+            if [ ! -e "$autodetect_compiler_TEMPDIR"/vcvars.txt ]; then 
+                autodetect_compiler_vsdev_dump_script
+                echo >&2
+                echo "FAILED: $autodetect_compiler_vsdev_INSTALLDIR_BUILDHOST/Common7/Tools/VsDevCmd.bat -no_logo -vcvars_ver=$VSDEV_VCVARSVER -winsdk=$VSDEV_WINSDKVER $*" >&2
+                set | "$DKMLSYS_GREP" "^DKML_COMPILE_" >&2
+                echo "DKMLPARENTHOME_BUILDHOST=${DKMLPARENTHOME_BUILDHOST:-}" >&2
+                exit 107
+            fi
         }
     else
         autodetect_compiler_vsdev_dump_vars_helper() {
+            rm -f "$autodetect_compiler_TEMPDIR"/vcvars.txt
             "$DKMLSYS_ENV" PATH="$autodetect_compiler_vsdev_SYSTEMPATHUNIX" __VSCMD_ARG_NO_LOGO=1 VSCMD_SKIP_SENDTELEMETRY=1 VSCMD_DEBUG="$autodetect_compiler_VSCMD_DEBUG" \
-                "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat -no_logo \
-                "$@" >&2
+                "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat \
+                -no_logo "$@" >&2
+            if [ ! -e "$autodetect_compiler_TEMPDIR"/vcvars.txt ]; then 
+                autodetect_compiler_vsdev_dump_script
+                echo >&2
+                echo "FAILED: $autodetect_compiler_vsdev_INSTALLDIR_BUILDHOST/Common7/Tools/VsDevCmd.bat -no_logo $*" >&2
+                set | "$DKMLSYS_GREP" "^DKML_COMPILE_" >&2
+                echo "DKMLPARENTHOME_BUILDHOST=${DKMLPARENTHOME_BUILDHOST:-}" >&2
+                exit 107
+            fi
         }
     fi
     if [ "$BUILDHOST_ARCH" = windows_x86 ]; then
@@ -2590,6 +2625,7 @@ autodetect_compiler_vsdev() {
     #   standardized and will be set and transformed later based on this output)
     # - MSVS_NAME,MSVS_PATH,MSVS_INC,MSVS_LIB,MSVS_ML (also standardized)
     # - _
+    # - -* (these interfere when passed to /usr/bin/env since they are treated as options)
     # - !ExitCode
     # - TEMP, TMP
     # - PWD
@@ -2629,7 +2665,7 @@ autodetect_compiler_vsdev() {
     $1 != "MSVS_LIB" &&
     $1 != "MSVS_ML" &&
     $1 !~ /^!ExitCode/ &&
-    $1 !~ /^_$/ && $1 != "TEMP" && $1 != "TMP" && $1 != "PWD" &&
+    $1 !~ /^_$/ && $1 !~ /^-/ && $1 != "TEMP" && $1 != "TMP" && $1 != "PWD" &&
     $1 != "PROMPT" && $1 !~ /^LOGON/ && $1 !~ /APPDATA$/ &&
     $1 != "ALLUSERSPROFILE" && $1 != "CYGWIN" && $1 != "CYGPATH" &&
     $1 !~ /^CI_/ && $1 !~ /_DEPLOY_TOKEN$/ && $1 !~ /^PG/ &&
@@ -2992,7 +3028,7 @@ sha256compute() {
         # Confer: https://www.thomas-krenn.com/en/wiki/Perl_warning_Setting_locale_failed_in_Debian
         # Confer: https://stackoverflow.com/a/52004330/21513816           
         #   shellcheck disable=SC2016
-        LANG=C.UTF-8 LC_ALL=C.UTF-8 /usr/bin/shasum -a 256 "$sha256compute_FILE" | "$DKMLSYS_AWK" '{print $1}'
+        LC_ALL=C /usr/bin/shasum -a 256 "$sha256compute_FILE" | "$DKMLSYS_AWK" '{print $1}'
     elif [ -x /usr/bin/sha256sum ]; then # Linux, MSYS2
         #   shellcheck disable=SC2016
         /usr/bin/sha256sum "$sha256compute_FILE" | "$DKMLSYS_AWK" '{print $1}'
@@ -3017,9 +3053,10 @@ sha256check() {
         # CODESITE #1 (duplicates elsewhere).
         # On Debian shasum is a perl script, and perl needs locale settings or it will complain.
         # Confer: https://www.thomas-krenn.com/en/wiki/Perl_warning_Setting_locale_failed_in_Debian
-        # Confer: https://stackoverflow.com/a/52004330/21513816           
-        #   shellcheck disable=SC2016        
-        printf "%s  %s" "$sha256check_SUM" "$sha256check_FILE" | LANG=C.UTF-8 LC_ALL=C.UTF-8 /usr/bin/shasum -a 256 -c >&2
+        # Confer: https://stackoverflow.com/a/52004330/21513816
+        # Note: shasum 5.96 (ex. conanio/gcc7:1.64.1) has no --quiet option.
+        #   shellcheck disable=SC2016
+        printf "%s  %s" "$sha256check_SUM" "$sha256check_FILE" | LC_ALL=C /usr/bin/shasum -a 256 -c >&2
     elif [ -x /usr/bin/sha256sum ]; then # Linux, MSYS2
         printf "%s  %s" "$sha256check_SUM" "$sha256check_FILE" | /usr/bin/sha256sum -c >&2
     elif [ -x /sbin/sha256 ]; then # FreeBSD

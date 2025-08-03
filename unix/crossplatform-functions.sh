@@ -133,7 +133,7 @@ default_dkmlvars() {
     fi
     autodetect_dkmlvars_DiskuvOCamlBinaryPaths_Override="$autodetect_dkmlvars_DiskuvOCamlHome_Override/usr/bin;$autodetect_dkmlvars_DiskuvOCamlHome_Override/bin"
     autodetect_dkmlvars_DiskuvOCamlDeploymentId_Override="default-592592597"
-    autodetect_dkmlvars_DiskuvOCamlVersion_Override=2.1.4
+    autodetect_dkmlvars_DiskuvOCamlVersion_Override=2.1.5
     autodetect_dkmlvars_DiskuvOCamlMSYS2Dir_Override=
 }
 autodetect_dkmlvars() {
@@ -1835,7 +1835,7 @@ compiler_clear_environment() {
 # Used by DKML's autodetect_compiler() function to customize compiler
 # variables before the variables are written to a launcher script.
 #
-# Anything printed on stdout is redirected to stderr as of DkML 2.1.4.
+# Anything printed on stdout is redirected to stderr as of DkML 2.1.5.
 #
 # On entry autodetect_compiler() will have populated some or all of the
 # following non-export variables:

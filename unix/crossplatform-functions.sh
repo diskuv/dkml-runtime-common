@@ -1554,6 +1554,7 @@ cmake_flag_notfound() {
 #   when they are supposed to invoke the linker, `ld`. Non-library linker flags, such as -L, should go in the LDFLAGS
 #   variable.
 # - (When DKML_COMPILE_TYPE=CM) AR - Archive-maintaining program
+# - (When DKML_COMPILE_TYPE=CM) DIRECT_LD - The linker used by OCaml (specific to ocaml's ./configure)
 # - (When DKML_COMPILE_TYPE=CM) DKML_COMPILE_CM_* - All these variables will be passed-through if CMake so
 #   downstream OCaml/Opam/etc. can fine-tune what flags / environment variables get passed into
 #   their `./configure` scripts
@@ -1704,6 +1705,7 @@ autodetect_compiler() {
     autodetect_compiler_LD=
     autodetect_compiler_LDFLAGS=
     autodetect_compiler_LDLIBS=
+    autodetect_compiler_DIRECT_LD=
     autodetect_compiler_MSVS_NAME=
     autodetect_compiler_MSVS_INC=
     autodetect_compiler_MSVS_LIB=
@@ -1814,6 +1816,9 @@ compiler_clear_environment() {
     export LDLIBS=
     export AR=
 
+    # OCaml autoconf
+    export DIRECT_LD=
+
     # msvs-detect
     export MSVS_NAME=
     export MSVS_PATH=
@@ -1850,6 +1855,7 @@ compiler_clear_environment() {
 # * autodetect_compiler_LD
 # * autodetect_compiler_LDFLAGS
 # * autodetect_compiler_LDLIBS
+# * autodetect_compiler_DIRECT_LD
 # * autodetect_compiler_MSVS_NAME
 # * autodetect_compiler_MSVS_INC. Separated by semicolons. No trailing semicolon.
 # * autodetect_compiler_MSVS_LIB. Separated by semicolons. No trailing semicolon.
@@ -1883,7 +1889,7 @@ autodetect_compiler_write_output() {
         if [ "$autodetect_compiler_OUTPUTMODE" = SEXP ]; then
             printf "(\n"
 
-            # shellcheck disable=SC2317
+            # shellcheck disable=SC2317 disable=SC2329
             export_binding() {
                 export_binding_NAME=$1
                 shift
@@ -1920,6 +1926,10 @@ autodetect_compiler_write_output() {
             autodetect_compiler_sexp_LDLIBS=$(escape_arg_as_ocaml_string "$autodetect_compiler_LDLIBS")
             printf "  (\"LDLIBS\" \"%s\")\n" "$autodetect_compiler_sexp_LDLIBS"
 
+            # OCaml ./configure flags
+            autodetect_compiler_sexp_DIRECT_LD=$(escape_arg_as_ocaml_string "$autodetect_compiler_DIRECT_LD")
+            printf "  (\"DIRECT_LD\" \"%s\")\n" "$autodetect_compiler_sexp_DIRECT_LD"
+
             # Passthrough all DKML_COMPILE_CM_* variables.
             # The first `sed` command removes any surrounding single quotes from any values.
             # The second `sed` command adds a surrounding parenthesis and double quote ("...") to each value.
@@ -1938,7 +1948,7 @@ autodetect_compiler_write_output() {
             fi
             printf "%s\n" "exec $DKMLSYS_ENV \\"
 
-            # shellcheck disable=SC2317
+            # shellcheck disable=SC2317 disable=SC2329
             export_binding() {
                 export_binding_NAME=$1
                 shift
@@ -1973,6 +1983,10 @@ autodetect_compiler_write_output() {
             printf "  LDFLAGS=%s %s\n" "$autodetect_compiler_launcher_LDFLAGS" "\\"
             autodetect_compiler_launcher_LDLIBS=$(escape_args_for_shell "$autodetect_compiler_LDLIBS")
             printf "  LDLIBS=%s %s\n" "$autodetect_compiler_launcher_LDLIBS" "\\"
+
+            # OCaml ./configure flags
+            autodetect_compiler_launcher_DIRECT_LD=$(escape_args_for_shell "$autodetect_compiler_DIRECT_LD")
+            printf "  DIRECT_LD=%s %s\n" "$autodetect_compiler_launcher_DIRECT_LD" "\\"
 
             # Passthrough all DKML_COMPILE_CM_* variables
             # shellcheck disable=SC2016
@@ -2115,7 +2129,7 @@ output_make ()
   echo \"\$1=\${VALUE//\\$/\\$\\$}\"
 }
 "
-            # shellcheck disable=SC2317
+            # shellcheck disable=SC2317 disable=SC2329
             export_binding() {
                 true
             }
@@ -2309,6 +2323,7 @@ autodetect_compiler_cmake() {
     autodetect_compiler_LD="${DKML_COMPILE_CM_CMAKE_LINKER:-}"
     autodetect_compiler_LDFLAGS="$autodetect_compiler_cmake_Specific_LDFLAGS"
     autodetect_compiler_LDLIBS="${DKML_COMPILE_CM_CMAKE_C_STANDARD_LIBRARIES:-}"
+    autodetect_compiler_DIRECT_LD="${DKML_COMPILE_CM_CMAKE_LINKER:-}"
     autodetect_compiler_MSVS_NAME="CMake ${DKML_COMPILE_CM_CMAKE_C_COMPILER_ID:-C} compiler${DKML_COMPILE_CM_CMAKE_C_COMPILER:+ at $DKML_COMPILE_CM_CMAKE_C_COMPILER}"
     #   CMake has no variables to populate these two (CMAKE_C_STANDARD_INCLUDE_DIRECTORIES is empty for MSVC), but we can use inferred variables CM_MSVC_INCLUDE/LIB.
     autodetect_compiler_MSVS_INC="${DKML_COMPILE_CM_MSVC_INCLUDE:-}"
@@ -2623,6 +2638,7 @@ autodetect_compiler_vsdev() {
     # - LIB (we actually add this, but we also add our own vcpkg library path)
     # - CC,CXX,CFLAGS,CXXFLAGS,AS,ASFLAGS,LD,LDFLAGS,LDLIBS,AR (these are
     #   standardized and will be set and transformed later based on this output)
+    # - DIRECT_LD (standardized for OCaml compiler)
     # - MSVS_NAME,MSVS_PATH,MSVS_INC,MSVS_LIB,MSVS_ML (also standardized)
     # - _
     # - -* (these interfere when passed to /usr/bin/env since they are treated as options)
@@ -2659,6 +2675,7 @@ autodetect_compiler_vsdev() {
     $1 != "LDFLAGS" &&
     $1 != "LDLIBS" &&
     $1 != "AR" &&
+    $1 != "DIRECT_LD" &&
     $1 != "MSVS_NAME" &&
     $1 != "MSVS_PATH" &&
     $1 != "MSVS_INC" &&
@@ -2763,6 +2780,7 @@ autodetect_compiler_vsdev() {
     fi
     autodetect_compiler_LDFLAGS=-nologo
     autodetect_compiler_LDLIBS=
+    autodetect_compiler_DIRECT_LD=
     autodetect_compiler_MSVS_PATH="$autodetect_compiler_COMPILER_UNIX_UNIQ_PATH"
 
     # === autodetect_compiler_MSVS_NAME

@@ -2400,8 +2400,27 @@ autodetect_compiler_system() {
             autodetect_compiler_LD=$(command -v ld || true)
             if [ -n "$autodetect_compiler_LD" ]; then
                 case "$autodetect_compiler_PLATFORM_ARCH" in
-                    linux_x86)    autodetect_compiler_LDFLAGS=-melf_i386 ;;
-                    linux_x86_64) autodetect_compiler_LDFLAGS=-melf_x86_64 ;;
+                    # Unfortunately the mess of bad autoconf in the OCaml ecosystem means we
+                    # have had times where setting the LDFLAGS to `-melf_i386` was insufficient.
+                    # Example:
+                    #   ld: Relocatable linking with relocations from format elf32-i386 (/tmp/dkmlw.hx2p3/camlDynlink_compilerlibs__15a96b.o) to format elf64-x86-64 (native/dynlink_compilerlibs.o) is not supported
+                    #   File "/builds/diskuv/distributions/1.0/dksdk-ffi-ocaml/build/o/ocamlffi/src-ocaml/otherlibs/dynlink/native/dynlink_compilerlibs.cmx", line 1:
+                    #   Error: Error during partial linking
+                    #   Makefile:198: recipe for target 'native/dynlink_compilerlibs.cmx' failed
+                    #   make[3]: *** [native/dynlink_compilerlibs.cmx] Error 2
+                    #   make[3]: Leaving directory '/builds/diskuv/distributions/1.0/dksdk-ffi-ocaml/build/o/ocamlffi/src-ocaml/otherlibs/dynlink'
+                    #   Makefile:35: recipe for target 'allopt' failed
+                    #   make[2]: *** [allopt] Error 2
+                    linux_x86)
+                        # So bundle a small shell script that calls ld -melf_i386 for the 32-bit case.
+                        printf 'exec ld -melf_i386 "$@"\n' > "$autodetect_compiler_OUTPUTFILE.ld32.sh"
+                        chmod +x "$autodetect_compiler_OUTPUTFILE.ld32.sh"
+                        autodetect_compiler_LD="$autodetect_compiler_OUTPUTFILE.ld32.sh" ;;
+                    linux_x86_64)
+                        # So bundle a small shell script that calls ld -melf_x86_64 for the 64-bit case.
+                        printf 'exec ld -melf_x86_64 "$@"\n' > "$autodetect_compiler_OUTPUTFILE.ld64.sh"
+                        chmod +x "$autodetect_compiler_OUTPUTFILE.ld64.sh"
+                        autodetect_compiler_LD="$autodetect_compiler_OUTPUTFILE.ld64.sh" ;;
                 esac
             fi
         fi

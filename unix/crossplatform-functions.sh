@@ -2415,12 +2415,14 @@ autodetect_compiler_system() {
                         # So bundle a small shell script that calls ld -melf_i386 for the 32-bit case.
                         printf 'exec ld -melf_i386 "$@"\n' > "$autodetect_compiler_OUTPUTFILE.ld32.sh"
                         chmod +x "$autodetect_compiler_OUTPUTFILE.ld32.sh"
-                        autodetect_compiler_LD="$autodetect_compiler_OUTPUTFILE.ld32.sh" ;;
+                        autodetect_compiler_LD="$autodetect_compiler_OUTPUTFILE.ld32.sh"
+                        autodetect_compiler_DIRECT_LD="$autodetect_compiler_OUTPUTFILE.ld32.sh" ;;
                     linux_x86_64)
                         # So bundle a small shell script that calls ld -melf_x86_64 for the 64-bit case.
                         printf 'exec ld -melf_x86_64 "$@"\n' > "$autodetect_compiler_OUTPUTFILE.ld64.sh"
                         chmod +x "$autodetect_compiler_OUTPUTFILE.ld64.sh"
-                        autodetect_compiler_LD="$autodetect_compiler_OUTPUTFILE.ld64.sh" ;;
+                        autodetect_compiler_LD="$autodetect_compiler_OUTPUTFILE.ld64.sh"
+                        autodetect_compiler_DIRECT_LD="$autodetect_compiler_OUTPUTFILE.ld64.sh" ;;
                 esac
             fi
         fi

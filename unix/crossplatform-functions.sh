@@ -2402,7 +2402,8 @@ autodetect_compiler_system() {
                 case "$autodetect_compiler_PLATFORM_ARCH" in
                     # Unfortunately the mess of bad autoconf in the OCaml ecosystem means we
                     # have had times where setting the LDFLAGS to `-melf_i386` was insufficient.
-                    # Example:
+                    # 
+                    # Example 1:
                     #   ld: Relocatable linking with relocations from format elf32-i386 (/tmp/dkmlw.hx2p3/camlDynlink_compilerlibs__15a96b.o) to format elf64-x86-64 (native/dynlink_compilerlibs.o) is not supported
                     #   File "/builds/diskuv/distributions/1.0/dksdk-ffi-ocaml/build/o/ocamlffi/src-ocaml/otherlibs/dynlink/native/dynlink_compilerlibs.cmx", line 1:
                     #   Error: Error during partial linking
@@ -2411,18 +2412,23 @@ autodetect_compiler_system() {
                     #   make[3]: Leaving directory '/builds/diskuv/distributions/1.0/dksdk-ffi-ocaml/build/o/ocamlffi/src-ocaml/otherlibs/dynlink'
                     #   Makefile:35: recipe for target 'allopt' failed
                     #   make[2]: *** [allopt] Error 2
+                    #
+                    # So keep LDFLAGS which is needed for [ocamlmklib.opt] in downstream projects like lwt.
+                    # And LD + DIRECT_LD both solves the Example 1 above.
                     linux_x86)
                         # So bundle a small shell script that calls ld -melf_i386 for the 32-bit case.
                         printf 'exec ld -melf_i386 "$@"\n' > "$autodetect_compiler_OUTPUTFILE.ld32.sh"
                         chmod +x "$autodetect_compiler_OUTPUTFILE.ld32.sh"
                         autodetect_compiler_LD="$autodetect_compiler_OUTPUTFILE.ld32.sh"
-                        autodetect_compiler_DIRECT_LD="$autodetect_compiler_OUTPUTFILE.ld32.sh" ;;
+                        autodetect_compiler_DIRECT_LD="$autodetect_compiler_OUTPUTFILE.ld32.sh"
+                        autodetect_compiler_LDFLAGS=-melf_i386 ;;
                     linux_x86_64)
                         # So bundle a small shell script that calls ld -melf_x86_64 for the 64-bit case.
                         printf 'exec ld -melf_x86_64 "$@"\n' > "$autodetect_compiler_OUTPUTFILE.ld64.sh"
                         chmod +x "$autodetect_compiler_OUTPUTFILE.ld64.sh"
                         autodetect_compiler_LD="$autodetect_compiler_OUTPUTFILE.ld64.sh"
-                        autodetect_compiler_DIRECT_LD="$autodetect_compiler_OUTPUTFILE.ld64.sh" ;;
+                        autodetect_compiler_DIRECT_LD="$autodetect_compiler_OUTPUTFILE.ld64.sh"
+                        autodetect_compiler_LDFLAGS=-melf_x86_64 ;;
                 esac
             fi
         fi

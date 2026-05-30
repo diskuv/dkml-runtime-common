@@ -217,7 +217,7 @@ autodetect_dkmlvars() {
     DKMLBINPATHS_BUILDHOST=
     DKMLMSYS2DIR_BUILDHOST=
 
-    if is_unixy_windows_build_machine; then
+    if [ -n "${COMSPEC:-}" ]; then
         if [ "${autodetect_dkmlvars_DiskuvOCaml_ForceDefaults:-}" = "0" ] && [ -e "$DKMLPARENTHOME_BUILDHOST\\dkmlvars.sh" ]; then
             if [ -x /usr/bin/cygpath ]; then
                 autodetect_dkmlvars_VARSSCRIPT=$(/usr/bin/cygpath -a "$DKMLPARENTHOME_BUILDHOST\\dkmlvars.sh")
@@ -271,7 +271,7 @@ autodetect_dkmlvars() {
         DKMLHOME_BUILDHOST="$DiskuvOCamlHome"
     fi
     # Unixize DiskuvOCamlMSYS2Dir
-    if is_unixy_windows_build_machine; then
+    if [ -n "${COMSPEC:-}" ]; then
         if [ -z "${DiskuvOCamlMSYS2Dir:-}" ]; then return 1; fi
         if [ -x /usr/bin/cygpath ]; then
             DKMLMSYS2DIR_BUILDHOST=$(/usr/bin/cygpath -aw "$DiskuvOCamlMSYS2Dir")
@@ -663,6 +663,9 @@ autodetect_system_binaries() {
 
 # Is a Windows build machine if we are in a MSYS2 or Cygwin environment.
 #
+# Use [ -n "${COMSPEC:-}" ] to check for Windows. BusyBox-w32 is Windows
+# but will return 1 (false) from this function.
+#
 # Better alternatives
 # -------------------
 #
@@ -716,7 +719,7 @@ is_arg_windows_platform() {
         windows_x86_64) return 0;;
         windows_arm32)  return 0;;
         windows_arm64)  return 0;;
-        dev)            if is_unixy_windows_build_machine; then return 0; else return 1; fi ;;
+        dev)            if [ -n "${COMSPEC:-}" ]; then return 0; else return 1; fi ;;
         *)              return 1;;
     esac
 }
@@ -1152,6 +1155,14 @@ autodetect_buildhost_arch() {
                 BUILDHOST_ARCH=darwin_arm64;;
             Darwin-x86_64)
                 BUILDHOST_ARCH=darwin_x86_64;;
+            Windows_NT-i686)
+                # ex. BusyBox-w32. Basically native Windows, with no cygpath
+                BUILDHOST_ARCH=windows_x86
+                ;;
+            Windows_NT-x86_64)
+                # ex. BusyBox-w32. Basically native Windows, with no cygpath
+                BUILDHOST_ARCH=windows_x86_64
+                ;;
             *-i386 | *-i686)
                 if is_unixy_windows_build_machine; then
                     BUILDHOST_ARCH=windows_x86
@@ -1311,7 +1322,9 @@ autodetect_vsdev() {
     export VSDEV_WINSDKVER=
     export VSDEV_MSVSPREFERENCE=
     export VSDEV_CMAKEGENERATOR=
-    if ! is_unixy_windows_build_machine; then
+
+    # Skip if not Windows machine (MSYS2/Cygwin/BusyBox-w32)
+    if [ -z "${COMSPEC:-}" ]; then
         return 0
     fi
 
@@ -3052,10 +3065,10 @@ autodetect_compiler_vsdev() {
 # - 1 if no DKML home and no DKSDK noabi/ directory set
 # - 2 if with-dkml not found at canonical location
 autodetect_withdkmlexe() {
-    if is_unixy_windows_build_machine; then
-        autodetect_withdkmlexe_SEP=\\
-    else
+    if [ -z "${COMSPEC:-}" ]; then
         autodetect_withdkmlexe_SEP=/
+    else
+        autodetect_withdkmlexe_SEP=\\
     fi
     if [ -z "${WITHDKMLEXE_BUILDHOST:-}" ]; then
         # Set DKMLHOME_UNIX if available
@@ -3067,7 +3080,7 @@ autodetect_withdkmlexe() {
         else
             return 1
         fi
-        if is_unixy_windows_build_machine; then
+        if [ -n "${COMSPEC:-}" ]; then
             WITHDKMLEXE_BUILDHOST="${WITHDKMLEXE_BUILDHOST}.exe"
         fi
     fi

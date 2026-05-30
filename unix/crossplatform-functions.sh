@@ -41,7 +41,7 @@
 # contains a colon (like all native Windows paths).
 #
 # DK_UNIX_ESSENTIALS: Optional. An environment containing the coreutils (bin/cat, etc.)
-# and a POSIX shell bin/sh.
+# and awk and sed and a POSIX shell bin/sh.
 
 export SHARE_OCAML_OPAM_REPO_RELPATH=share/dkml/repro
 export SHARE_REPRODUCIBLE_BUILD_RELPATH=share/dkml/repro
@@ -53,7 +53,7 @@ export SHARE_FUNCTIONS_RELPATH=share/dkml/functions
 # that emulates the /bin binaries.
 #
 # These binaries are supported in this version:
-# - awk
+# - awk.        delegates to DK_UNIX_ESSENTIALS if available.
 # - basename.   delegates to coreutils if available.
 # - cat.        delegates to coreutils if available.
 # - chmod.      delegates to coreutils if available.
@@ -61,18 +61,19 @@ export SHARE_FUNCTIONS_RELPATH=share/dkml/functions
 # - comm.       delegates to coreutils if available.
 # - cp.         delegates to coreutils if available.
 # - cut.        delegates to coreutils if available.
-# - curl
+# - curl.       delegates to DK_UNIX_ESSENTIALS if available.
 # - date.       delegates to coreutils if available.
 # - dirname.    delegates to coreutils if available.
 # - env.        delegates to coreutils if available.
-# - grep
+# - find.       delegates to DK_UNIX_ESSENTIALS if available.
+# - grep.       delegates to DK_UNIX_ESSENTIALS if available.
 # - install.    delegates to coreutils if available.
 # - mktemp.     delegates to coreutils if available.
 # - mv.         delegates to coreutils if available.
 # - paste.      delegates to coreutils if available.
 # - pwd.        delegates to coreutils if available.
 # - rm.         delegates to coreutils if available.
-# - sed
+# - sed.        delegates to DK_UNIX_ESSENTIALS if available.
 # - sort.       delegates to coreutils if available.
 # - stat.       delegates to coreutils if available.
 # - touch.      delegates to coreutils if available.
@@ -85,12 +86,18 @@ hermetic_util() {
         PATH=/usr/bin:/bin "$@"
     else
         case "$1" in
-            awk|basename|cat|chmod|cmp|comm|cp|cut|date|dirname|env|install|mktemp|mv|paste|pwd|rm|sort|stat|touch|tr|uname|wc)
+            basename|cat|chmod|cmp|comm|cp|cut|date|dirname|env|install|mktemp|mv|paste|pwd|rm|sort|stat|touch|tr|uname|wc)
                 "$DK_UNIX_COREUTILS" "$@"
                 ;;
+            awk|curl|find|grep|sed|wget)
+                if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "$DK_UNIX_ESSENTIALS/bin/$1" ]; then
+                    shift
+                    "$DK_UNIX_ESSENTIALS/bin/$1" "$@"
+                else
+                    PATH=/usr/bin:/bin "$@"
+                fi ;;
             *)
-                 PATH=/usr/bin:/bin "$@"
-                ;;
+                PATH=/usr/bin:/bin "$@" ;;
         esac
     fi
 }

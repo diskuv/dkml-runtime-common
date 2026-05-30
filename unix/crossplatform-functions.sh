@@ -31,26 +31,62 @@
 #
 # DK_RUNTIME_DIR: DK_RUNTIME_DIR/drc is used for create_workdir() if $DK_RUNTIME_DIR defined
 #
-# DK_UNIX_ESSENTIALS: Instead of restricting to PATH=/usr/bin:/bin, no PATH restriction is used.
-# The expectation is that the dk0 build system has already setup the PATH. The problem is
+# DK_UNIX_COREUTILS: When hermetically spawning a coreutils binary, a search is done
+# in /usr/bin and then /bin. But uutils has a single binary for all coreutils and does not
+# need to be in /usr/bin or /bin (especially on Windows). Set this path to the location of
+# a coreutils single binary and "coreutils mktemp ...", "coreutils dirname ...", etc. will
+# be used. On Windows with a BusyBox-w32 shell, this setting is required. The problem is
 # that BusyBox-w32 has no drive mounting like /c/ or /cygdrive/c in Cygwin/MSYS2
 # (confer https://frippery.org/busybox/paths.html) so no way to encode a PATH item that
 # contains a colon (like all native Windows paths).
+#
+# DK_UNIX_ESSENTIALS: Optional. An environment containing the coreutils (bin/cat, etc.)
+# and a POSIX shell bin/sh.
 
 export SHARE_OCAML_OPAM_REPO_RELPATH=share/dkml/repro
 export SHARE_REPRODUCIBLE_BUILD_RELPATH=share/dkml/repro
 export SHARE_FUNCTIONS_RELPATH=share/dkml/functions
 
-# Binaries that may be hermetically spawned:
-# - dirname
-# - install
-# - mktemp
+# Spawn a binary that should only be run from /usr/bin or /bin on Unix
+# (or MSYS2 or Cygwin). On native Windows (ex. BusyBox-w32 sh.exe)
+# set the DK_UNIX_COREUTILS to a uutils' coreutils.exe single binary
+# that emulates the /bin binaries.
+#
+# These binaries are supported in this version:
+# - awk
+# - cat.        delegates to coreutils if available.
+# - chmod.      delegates to coreutils if available.
+# - comm.       delegates to coreutils if available.
+# - cp.         delegates to coreutils if available.
+# - cut.        delegates to coreutils if available.
+# - curl
+# - date.       delegates to coreutils if available.
+# - dirname.    delegates to coreutils if available.
+# - env.        delegates to coreutils if available.
+# - grep
+# - install.    delegates to coreutils if available.
+# - mktemp.     delegates to coreutils if available.
+# - mv.         delegates to coreutils if available.
+# - paste.      delegates to coreutils if available.
+# - rm.         delegates to coreutils if available.
 # - sed
-__hermetic_spawn() {
-    if [ -z "${DK_UNIX_ESSENTIALS:-}" ]; then
+# - sort.       delegates to coreutils if available.
+# - stat.       delegates to coreutils if available.
+# - tr.         delegates to coreutils if available.
+# - uname.      delegates to coreutils if available.
+# - wget
+__hermetic_spawn() {    
+    if [ -z "${DK_UNIX_COREUTILS:-}" ]; then
         PATH=/usr/bin:/bin "$@"
     else
-        "$@"
+        case "$1" in
+            awk|cat|chmod|comm|cp|cut|date|dirname|env|install|mktemp|mv|paste|rm|sort|stat|tr|uname)
+                "$DK_UNIX_COREUTILS" "$@"
+                ;;
+            *)
+                 PATH=/usr/bin:/bin "$@"
+                ;;
+        esac
     fi
 }
 
@@ -71,6 +107,10 @@ autodetect_posix_shell() {
     export DKML_HOST_POSIX_SHELL
     if [ -n "${DKML_POSIX_SHELL:-}" ] && [ -n "${DKML_HOST_POSIX_SHELL}" ]; then
         return
+    elif [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "$DK_UNIX_ESSENTIALS/bin/sh.exe" ]; then
+        DKML_POSIX_SHELL="$DK_UNIX_ESSENTIALS/bin/sh.exe"
+    elif [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "$DK_UNIX_ESSENTIALS/bin/sh" ]; then
+        DKML_POSIX_SHELL="$DK_UNIX_ESSENTIALS/bin/sh"
     # On MSYS2 especially, binaries look like they exist simultaneously in /usr/bin and /bin but
     # only if you are inside MSYS2. The binaries in /bin are in fact a mount of /usr/bin.
     # This is a critical problem for `opam exec -- /bin/dash.exe` which will fail because Opam cannot
@@ -423,11 +463,50 @@ autodetect_system_path_with_git_before_usr_bin() {
     __autodetect_system_path_helper GIT_FIRST
 }
 
+# Get standard locations of system curl and wget like `/usr/bin/curl` (or `/bin/curl`).
+#
+# Will not return anything in `/usr/local/bin` or `/usr/sbin`. Use when you do not
+# know whether the PATH has been set correctly, or when you do not know if the
+# system binary exists.
+#
+# Outputs:
+# - env:DKMLSYS_CURL - Location of `curl` (empty if not found)
+# - env:DKMLSYS_WGET - Location of `wget` (empty if not found)
+autodetect_system_fetchers() {
+    if [ -z "${DKMLSYS_CURL:-}" ]; then
+        if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "${DK_UNIX_ESSENTIALS}/bin/curl" ]; then
+            DKMLSYS_CURL="${DK_UNIX_ESSENTIALS}/bin/curl"
+        elif [ -x /usr/bin/curl ]; then
+            DKMLSYS_CURL=/usr/bin/curl
+        elif [ -x /bin/curl ]; then
+            DKMLSYS_CURL=/bin/curl
+        else
+            DKMLSYS_CURL=
+        fi
+    fi
+    if [ -z "${DKMLSYS_WGET:-}" ]; then
+        if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "${DK_UNIX_ESSENTIALS}/bin/wget" ]; then
+            DKMLSYS_WGET="${DK_UNIX_ESSENTIALS}/bin/wget"
+        elif [ -x /usr/bin/wget ]; then
+            DKMLSYS_WGET=/usr/bin/wget
+        elif [ -x /bin/wget ]; then
+            DKMLSYS_WGET=/bin/wget
+        else
+            DKMLSYS_WGET=
+        fi
+    fi
+    export DKMLSYS_CURL DKMLSYS_WGET
+}
+
+# DEPRECATED. Use __hermetic_spawn instead.
+#
 # Get standard locations of Unix system binaries like `/usr/bin/mv` (or `/bin/mv`).
 #
 # Will not return anything in `/usr/local/bin` or `/usr/sbin`. Use when you do not
 # know whether the PATH has been set correctly, or when you do not know if the
 # system binary exists.
+#
+# Calls autodetect_system_fetchers() automatically.
 #
 # At some point in the future, this function will error out if the required system binaries
 # do not exist. Most system binaries are common to all Unix/Linux/macOS installations but
@@ -451,6 +530,7 @@ autodetect_system_path_with_git_before_usr_bin() {
 # - env:DKMLSYS_WGET - Location of `wget` (empty if not found)
 # - env:DKMLSYS_TR - Location of `tr`
 autodetect_system_binaries() {
+    autodetect_system_fetchers
     if [ -z "${DKMLSYS_MV:-}" ]; then
         if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "${DK_UNIX_ESSENTIALS}/bin/mv" ]; then
             DKMLSYS_MV="${DK_UNIX_ESSENTIALS}/bin/mv"
@@ -566,28 +646,6 @@ autodetect_system_binaries() {
             DKMLSYS_GREP=/usr/bin/grep
         else
             DKMLSYS_GREP=/bin/grep
-        fi
-    fi
-    if [ -z "${DKMLSYS_CURL:-}" ]; then
-        if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "${DK_UNIX_ESSENTIALS}/bin/curl" ]; then
-            DKMLSYS_CURL="${DK_UNIX_ESSENTIALS}/bin/curl"
-        elif [ -x /usr/bin/curl ]; then
-            DKMLSYS_CURL=/usr/bin/curl
-        elif [ -x /bin/curl ]; then
-            DKMLSYS_CURL=/bin/curl
-        else
-            DKMLSYS_CURL=
-        fi
-    fi
-    if [ -z "${DKMLSYS_WGET:-}" ]; then
-        if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "${DK_UNIX_ESSENTIALS}/bin/wget" ]; then
-            DKMLSYS_WGET="${DK_UNIX_ESSENTIALS}/bin/wget"
-        elif [ -x /usr/bin/wget ]; then
-            DKMLSYS_WGET=/usr/bin/wget
-        elif [ -x /bin/wget ]; then
-            DKMLSYS_WGET=/bin/wget
-        else
-            DKMLSYS_WGET=
         fi
     fi
     if [ -z "${DKMLSYS_TR:-}" ]; then
@@ -710,11 +768,8 @@ is_arg_darwin_based_platform() {
 #  env:BOOTSTRAPNAME - Examples include: 110co
 #  env:DKMLDIR - The directory with .dkmlroot
 install_reproducible_common() {
-    # Set DKMLSYS_*
-    autodetect_system_binaries
-
     install_reproducible_common_BOOTSTRAPDIR=$DEPLOYDIR_UNIX/$SHARE_REPRODUCIBLE_BUILD_RELPATH/$BOOTSTRAPNAME
-    "$DKMLSYS_INSTALL" -d "$install_reproducible_common_BOOTSTRAPDIR"
+    __hermetic_spawn install -d "$install_reproducible_common_BOOTSTRAPDIR"
     install_reproducible_file .dkmlroot
     install_reproducible_file vendor/drc/unix/crossplatform-functions.sh
     install_reproducible_file vendor/drc/unix/_common_tool.sh
@@ -731,14 +786,11 @@ install_reproducible_common() {
 #       It will be deployed relative to $DEPLOYDIR_UNIX and it
 #       must be specified as an existing relative path to $DKMLDIR.
 install_reproducible_file() {
-    # Set DKMLSYS_*
-    autodetect_system_binaries
-
     _install_reproducible_file_RELFILE="$1"
     shift
     _install_reproducible_file_RELDIR=$(dirname "$_install_reproducible_file_RELFILE")
     _install_reproducible_file_BOOTSTRAPDIR=$DEPLOYDIR_UNIX/$SHARE_REPRODUCIBLE_BUILD_RELPATH/$BOOTSTRAPNAME
-    "$DKMLSYS_INSTALL" -d "$_install_reproducible_file_BOOTSTRAPDIR"/"$_install_reproducible_file_RELDIR"/
+    __hermetic_spawn install -d "$_install_reproducible_file_BOOTSTRAPDIR"/"$_install_reproducible_file_RELDIR"/
     # When we rerun a setup script from within
     # the reproducible target directory we may be installing on top of ourselves; that is, installing with
     # the source and destination files being the same file.
@@ -746,18 +798,18 @@ install_reproducible_file() {
     if [ /dev/null -ef /dev/null ] 2>/dev/null; then
         # This script accepts the -ef operator
         if [ ! "$DKMLDIR"/"$_install_reproducible_file_RELFILE" -ef "$_install_reproducible_file_BOOTSTRAPDIR"/"$_install_reproducible_file_RELFILE" ]; then
-            "$DKMLSYS_INSTALL" "$DKMLDIR"/"$_install_reproducible_file_RELFILE" "$_install_reproducible_file_BOOTSTRAPDIR"/"$_install_reproducible_file_RELDIR"/
+            __hermetic_spawn install "$DKMLDIR"/"$_install_reproducible_file_RELFILE" "$_install_reproducible_file_BOOTSTRAPDIR"/"$_install_reproducible_file_RELDIR"/
         fi
     else
         # Sigh; portable scripts are not required to have a [ f1 -ef f2 ] operator. So we compare inodes (assuming `stat` supports `-c`)
-        install_reproducible_file_STAT1=$("$DKMLSYS_STAT" -c '%i' "$DKMLDIR"/"$_install_reproducible_file_RELFILE")
+        install_reproducible_file_STAT1=$(__hermetic_spawn stat -c '%i' "$DKMLDIR"/"$_install_reproducible_file_RELFILE")
         if [ -e "$_install_reproducible_file_BOOTSTRAPDIR"/"$_install_reproducible_file_RELFILE" ]; then
-            install_reproducible_file_STAT2=$("$DKMLSYS_STAT" -c '%i' "$_install_reproducible_file_BOOTSTRAPDIR"/"$_install_reproducible_file_RELFILE")
+            install_reproducible_file_STAT2=$(__hermetic_spawn stat -c '%i' "$_install_reproducible_file_BOOTSTRAPDIR"/"$_install_reproducible_file_RELFILE")
         else
             install_reproducible_file_STAT2=
         fi
         if [ ! "$install_reproducible_file_STAT1" = "$install_reproducible_file_STAT2" ]; then
-            "$DKMLSYS_INSTALL" "$DKMLDIR"/"$_install_reproducible_file_RELFILE" "$_install_reproducible_file_BOOTSTRAPDIR"/"$_install_reproducible_file_RELDIR"/
+            __hermetic_spawn install "$DKMLDIR"/"$_install_reproducible_file_RELFILE" "$_install_reproducible_file_BOOTSTRAPDIR"/"$_install_reproducible_file_RELDIR"/
         fi
     fi
 }
@@ -773,18 +825,15 @@ install_reproducible_file() {
 #  $2 - The location of the script that will be installed.
 #       It must be specified relative to $DEPLOYDIR_UNIX.
 install_reproducible_generated_file() {
-    # Set DKMLSYS_*
-    autodetect_system_binaries
-
     install_reproducible_generated_file_SRCFILE="$1"
     shift
     install_reproducible_generated_file_RELFILE="$1"
     shift
     install_reproducible_generated_file_RELDIR=$(dirname "$install_reproducible_generated_file_RELFILE")
     install_reproducible_generated_file_BOOTSTRAPDIR=$DEPLOYDIR_UNIX/$SHARE_REPRODUCIBLE_BUILD_RELPATH/$BOOTSTRAPNAME
-    "$DKMLSYS_INSTALL" -d "$install_reproducible_generated_file_BOOTSTRAPDIR"/"$install_reproducible_generated_file_RELDIR"/
-    "$DKMLSYS_RM" -f "$install_reproducible_generated_file_BOOTSTRAPDIR"/"$install_reproducible_generated_file_RELFILE" # ensure if exists it is a regular file or link but not a directory
-    "$DKMLSYS_INSTALL" "$install_reproducible_generated_file_SRCFILE" "$install_reproducible_generated_file_BOOTSTRAPDIR"/"$install_reproducible_generated_file_RELFILE"
+    __hermetic_spawn install -d "$install_reproducible_generated_file_BOOTSTRAPDIR"/"$install_reproducible_generated_file_RELDIR"/
+    __hermetic_spawn rm -f "$install_reproducible_generated_file_BOOTSTRAPDIR"/"$install_reproducible_generated_file_RELFILE" # ensure if exists it is a regular file or link but not a directory
+    __hermetic_spawn install "$install_reproducible_generated_file_SRCFILE" "$install_reproducible_generated_file_BOOTSTRAPDIR"/"$install_reproducible_generated_file_RELFILE"
 }
 
 # Install a README.md file that go into your reproducible build.
@@ -801,9 +850,6 @@ install_reproducible_generated_file() {
 #       It will be deployed as 'README.md' in the bootstrap folder of $DEPLOYDIR_UNIX and it
 #       must be specified as an existing relative path to $DKMLDIR.
 install_reproducible_readme() {
-    # Set DKMLSYS_*
-    autodetect_system_binaries
-
     install_reproducible_readme_RELFILE="$1"
     shift
 
@@ -812,8 +858,8 @@ install_reproducible_readme() {
 
     # Also place as a standalone README at the top of the reproducible tree
     install_reproducible_readme_BOOTSTRAPDIR=$DEPLOYDIR_UNIX/$SHARE_REPRODUCIBLE_BUILD_RELPATH/$BOOTSTRAPNAME
-    "$DKMLSYS_INSTALL" -d "$install_reproducible_readme_BOOTSTRAPDIR"
-    "$DKMLSYS_SED" "s,@@BOOTSTRAPDIR_UNIX@@,$SHARE_REPRODUCIBLE_BUILD_RELPATH/$BOOTSTRAPNAME/,g" "$DKMLDIR"/"$install_reproducible_readme_RELFILE" > "$install_reproducible_readme_BOOTSTRAPDIR"/README.md
+    __hermetic_spawn install -d "$install_reproducible_readme_BOOTSTRAPDIR"
+    __hermetic_spawn sed "s,@@BOOTSTRAPDIR_UNIX@@,$SHARE_REPRODUCIBLE_BUILD_RELPATH/$BOOTSTRAPNAME/,g" "$DKMLDIR"/"$install_reproducible_readme_RELFILE" > "$install_reproducible_readme_BOOTSTRAPDIR"/README.md
 }
 
 # Changes the suffix of a string and print to the standard output.
@@ -836,10 +882,7 @@ change_suffix() {
     change_suffix_NEW_SUFFIX="$1"
     shift
 
-    # Set DKMLSYS_*
-    autodetect_system_binaries
-
-    printf "%s" "$change_suffix_TEXT" | "$DKMLSYS_AWK" -v REPLACE="$change_suffix_NEW_SUFFIX" "{ gsub(/$change_suffix_OLD_SUFFIX/,REPLACE); print }"
+    printf "%s" "$change_suffix_TEXT" | __hermetic_spawn awk -v REPLACE="$change_suffix_NEW_SUFFIX" "{ gsub(/$change_suffix_OLD_SUFFIX/,REPLACE); print }"
 }
 
 # Replaces all occurrences of the search term with a replacement string, and print to the standard output.
@@ -857,18 +900,15 @@ change_suffix() {
 #
 # Any characters can be used in TEXT and REPLACE.
 replace_all() {
-    # Set DKMLSYS_*
-    autodetect_system_binaries
-
     replace_all_TEXT="$1"
     shift
     replace_all_SEARCH="$1"
     shift
     replace_all_REPLACE="$1"
     shift
-    replace_all_REPLACE=$(printf "%s" "$replace_all_REPLACE" | "$DKMLSYS_SED" 's#\\#\\\\#g') # escape all backslashes for awk
+    replace_all_REPLACE=$(printf "%s" "$replace_all_REPLACE" | __hermetic_spawn sed 's#\\#\\\\#g') # escape all backslashes for awk
 
-    printf "%s" "$replace_all_TEXT" | "$DKMLSYS_AWK" -v REPLACE="$replace_all_REPLACE" "{ gsub(/$replace_all_SEARCH/,REPLACE); print }"
+    printf "%s" "$replace_all_TEXT" | __hermetic_spawn awk -v REPLACE="$replace_all_REPLACE" "{ gsub(/$replace_all_SEARCH/,REPLACE); print }"
 }
 
 # Install a script that can re-install necessary system packages.
@@ -885,8 +925,6 @@ replace_all() {
 #       Must end with `.sh`.
 #  $@ - All remaining arguments are how to invoke the run script ($1).
 install_reproducible_system_packages() {
-    # Set DKMLSYS_*
-    autodetect_system_binaries
     # Set BUILDHOST_ARCH
     autodetect_buildhost_arch
 
@@ -900,7 +938,7 @@ install_reproducible_system_packages() {
     install_reproducible_system_packages_SCRIPTDIR=$(dirname "$install_reproducible_system_packages_SCRIPTFILE")
     install_reproducible_system_packages_BOOTSTRAPRELDIR=$SHARE_REPRODUCIBLE_BUILD_RELPATH/$BOOTSTRAPNAME
     install_reproducible_system_packages_BOOTSTRAPDIR=$DEPLOYDIR_UNIX/$install_reproducible_system_packages_BOOTSTRAPRELDIR
-    "$DKMLSYS_INSTALL" -d "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTDIR"/
+    __hermetic_spawn install -d "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTDIR"/
 
     if is_msys2_msys_build_machine && [ -x /git-bash.exe ]; then
         # Git Bash
@@ -933,7 +971,7 @@ install_reproducible_system_packages() {
         if command -v brew >/dev/null; then
             # Brew exists and its installed packages can be used in the rest of the reproducible scripts.
             if [ -n "${DKML_REPRODUCIBLE_SYSTEM_BREWFILE:-}" ] && [ -e "${DKML_REPRODUCIBLE_SYSTEM_BREWFILE}" ]; then
-                $DKMLSYS_INSTALL \
+                __hermetic_spawn install \
                     "$DKML_REPRODUCIBLE_SYSTEM_BREWFILE" \
                     "$install_reproducible_system_packages_BOOTSTRAPDIR/$install_reproducible_system_packages_PACKAGEFILE"
                 # For troubleshooting and a bit of security, place a comment saying the Brewfile was provided not queried
@@ -942,14 +980,14 @@ install_reproducible_system_packages() {
                 install_reproducible_system_packages_OLDDIR=$PWD
                 if ! cd "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTDIR"; then echo "FATAL: Could not cd to script directory" >&2; exit 107; fi
                 #   Read-only Homebrew without any fancy interactive display
-                $DKMLSYS_ENV \
+                __hermetic_spawn env \
                     HOMEBREW_NO_AUTO_UPDATE=1 \
                     HOMEBREW_NO_ANALYTICS=1 \
                     HOMEBREW_NO_COLOR=1 \
                     HOMEBREW_NO_EMOJI=1 \
                     brew bundle dump --force # creates a Brewfile in current directory
                 if ! cd "$install_reproducible_system_packages_OLDDIR"; then echo "FATAL: Could not cd to old directory" >&2; exit 107; fi
-                $DKMLSYS_MV \
+                __hermetic_spawn mv \
                     "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTDIR"/Brewfile \
                     "$install_reproducible_system_packages_BOOTSTRAPDIR/$install_reproducible_system_packages_PACKAGEFILE"
             fi
@@ -1035,7 +1073,7 @@ install_reproducible_system_packages() {
         printf "%s\n" "TODO: unsupported install_reproducible_system_packages platform" >&2
         exit 1
     fi
-    "$DKMLSYS_CHMOD" 755 "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"
+    __hermetic_spawn chmod 755 "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"
 }
 
 # Install a script that can relaunch itself in a relocated position.
@@ -1050,9 +1088,6 @@ install_reproducible_system_packages() {
 #       Must end with `.sh`.
 #  $@ - All remaining arguments are how to invoke the run script ($1).
 install_reproducible_script_with_args() {
-    # Set DKMLSYS_*
-    autodetect_system_binaries
-
     install_reproducible_script_with_args_SCRIPTFILE="$1"
     shift
     install_reproducible_script_with_args_RECREATEFILE=$(change_suffix "$install_reproducible_script_with_args_SCRIPTFILE" .sh -noargs.sh)
@@ -1065,7 +1100,7 @@ install_reproducible_script_with_args() {
     install_reproducible_script_with_args_BOOTSTRAPDIR=$DEPLOYDIR_UNIX/$install_reproducible_script_with_args_BOOTSTRAPRELDIR
 
     install_reproducible_file "$install_reproducible_script_with_args_SCRIPTFILE"
-    "$DKMLSYS_INSTALL" -d "$install_reproducible_script_with_args_BOOTSTRAPDIR"/"$install_reproducible_script_with_args_RECREATEDIR"/
+    __hermetic_spawn install -d "$install_reproducible_script_with_args_BOOTSTRAPDIR"/"$install_reproducible_script_with_args_RECREATEDIR"/
     {
         printf "#!/bin/sh\n"
         printf "set -euf\n"
@@ -1082,7 +1117,7 @@ install_reproducible_script_with_args() {
         printf "\n"
         printf "fi\n"
     } > "$install_reproducible_script_with_args_BOOTSTRAPDIR"/"$install_reproducible_script_with_args_RECREATEFILE"
-    "$DKMLSYS_CHMOD" 755 "$install_reproducible_script_with_args_BOOTSTRAPDIR"/"$install_reproducible_script_with_args_RECREATEFILE"
+    __hermetic_spawn chmod 755 "$install_reproducible_script_with_args_BOOTSTRAPDIR"/"$install_reproducible_script_with_args_RECREATEFILE"
 }
 
 # Tries to find the host ABI.
@@ -1099,11 +1134,8 @@ autodetect_buildhost_arch() {
     if [ -n "${DKML_HOST_ABI:-}" ]; then
         BUILDHOST_ARCH=$DKML_HOST_ABI
     else
-        # Set DKMLSYS_*
-        autodetect_system_binaries
-
-        autodetect_buildhost_arch_SYSTEM=$("$DKMLSYS_UNAME" -s)
-        autodetect_buildhost_arch_MACHINE=$("$DKMLSYS_UNAME" -m)
+        autodetect_buildhost_arch_SYSTEM=$(__hermetic_spawn uname -s)
+        autodetect_buildhost_arch_MACHINE=$(__hermetic_spawn uname -m)
         # list from https://en.wikipedia.org/wiki/Uname and https://stackoverflow.com/questions/45125516/possible-values-for-uname-m
         case "${autodetect_buildhost_arch_SYSTEM}-${autodetect_buildhost_arch_MACHINE}" in
             Linux-armv7*)
@@ -1171,9 +1203,6 @@ disambiguate_filesystem_paths() {
 # - env:NUMCPUS . Maximum of 8 if detectable; otherwise 1. Always a number from 1 to 8, even
 #   if on input env:NUMCPUS was set to text.
 autodetect_cpus() {
-    # Set DKMLSYS_*
-    autodetect_system_binaries
-
     # initialize to 0 if not set
     if [ -z "${NUMCPUS:-}" ]; then
         NUMCPUS=0
@@ -1181,16 +1210,18 @@ autodetect_cpus() {
     # type cast to a number (in case user gave a string)
     NUMCPUS=$(( NUMCPUS + 0 ))
     if [ "${NUMCPUS}" -eq 0 ]; then
-        # need temp directory
-        if [ -n "${_CS_DARWIN_USER_TEMP_DIR:-}" ]; then # macOS (see `man mktemp`)
-            autodetect_cpus_TEMPDIR=$(mktemp -d "$_CS_DARWIN_USER_TEMP_DIR"/dkmlcpu.XXXXX)
+        # need temp directory (SYNC: autodetect_cpus, create_workdir, install_reproducible_system_packages)
+        if [ -n "${DK_RUNTIME_DIR:-}" ]; then # dk0, etc.
+            autodetect_cpus_TEMPDIR=$(__hermetic_spawn mktemp -d "$DK_RUNTIME_DIR"/drc/dkmlcpu.XXXXX)
+        elif [ -n "${_CS_DARWIN_USER_TEMP_DIR:-}" ]; then # macOS (see `man mktemp`)
+            autodetect_cpus_TEMPDIR=$(__hermetic_spawn mktemp -d "$_CS_DARWIN_USER_TEMP_DIR"/dkmlcpu.XXXXX)
         elif [ -n "${TMPDIR:-}" ]; then # macOS (see `man mktemp`)
             autodetect_cpus_TEMPDIR=$(printf "%s" "$TMPDIR" | sed 's#/$##') # remove trailing slash on macOS
-            autodetect_cpus_TEMPDIR=$(mktemp -d "$autodetect_cpus_TEMPDIR"/dkmlcpu.XXXXX)
+            autodetect_cpus_TEMPDIR=$(__hermetic_spawn mktemp -d "$autodetect_cpus_TEMPDIR"/dkmlcpu.XXXXX)
         elif [ -n "${TMP:-}" ]; then # MSYS2 (Windows), Linux
-            autodetect_cpus_TEMPDIR=$(mktemp -d "$TMP"/dkmlcpu.XXXXX)
+            autodetect_cpus_TEMPDIR=$(__hermetic_spawn mktemp -d "$TMP"/dkmlcpu.XXXXX)
         else
-            autodetect_cpus_TEMPDIR=$(mktemp -d /tmp/dkmlcpu.XXXXX)
+            autodetect_cpus_TEMPDIR=$(__hermetic_spawn mktemp -d /tmp/dkmlcpu.XXXXX)
         fi
 
         # do calculations
@@ -1200,14 +1231,14 @@ autodetect_cpus() {
             NUMCPUS="$NUMBER_OF_PROCESSORS"
         elif [ -x /usr/bin/getconf ] && /usr/bin/getconf _NPROCESSORS_ONLN > "$autodetect_cpus_TEMPDIR"/numcpus 2>/dev/null && [ -s "$autodetect_cpus_TEMPDIR"/numcpus ]; then
             # getconf is POSIX standard; works on macOS; https://pubs.opengroup.org/onlinepubs/009604499/utilities/getconf.html
-            NUMCPUS=$("$DKMLSYS_CAT" "$autodetect_cpus_TEMPDIR"/numcpus)
+            NUMCPUS=$(__hermetic_spawn cat "$autodetect_cpus_TEMPDIR"/numcpus)
         elif [ -x /usr/bin/nproc ] && /usr/bin/nproc --all > "$autodetect_cpus_TEMPDIR"/numcpus 2>/dev/null && [ -s "$autodetect_cpus_TEMPDIR"/numcpus ]; then
             # nproc is usually available on Linux
-            NUMCPUS=$("$DKMLSYS_CAT" "$autodetect_cpus_TEMPDIR"/numcpus)
+            NUMCPUS=$(__hermetic_spawn cat "$autodetect_cpus_TEMPDIR"/numcpus)
         fi
 
         # clean temp directory
-        rm -rf "$autodetect_cpus_TEMPDIR"
+        __hermetic_spawn rm -rf "$autodetect_cpus_TEMPDIR"
     fi
     # type cast again to a number (in case autodetection produced a string)
     NUMCPUS=$(( NUMCPUS + 0 ))
@@ -1222,7 +1253,7 @@ vscmd_ver_to_vsstudio_msvspreference() {
     vscmd_ver_to_vsstudio_msvspreference_VER=$1
     shift
     #   shellcheck disable=SC2016
-    printf "VS%s" "$vscmd_ver_to_vsstudio_msvspreference_VER" | "$DKMLSYS_AWK" 'BEGIN{RS="\r\n"; FS="."} {print $1 "." $2; exit}'
+    printf "VS%s" "$vscmd_ver_to_vsstudio_msvspreference_VER" | __hermetic_spawn awk 'BEGIN{RS="\r\n"; FS="."} {print $1 "." $2; exit}'
 }
 
 # Set VSDEV_HOME_UNIX and VSDEV_HOME_BUILDHOST, if Visual Studio was installed or detected during
@@ -1286,8 +1317,6 @@ autodetect_vsdev() {
 
     # Set DKMLPARENTHOME_BUILDHOST
     set_dkmlparenthomedir
-    # Set DKMLSYS_*
-    autodetect_system_binaries
 
     if [ "${DKML_COMPILE_SPEC:-}" = 1 ] && [ "${DKML_COMPILE_TYPE:-}" = VS ]; then
         autodetect_vsdev_VSSTUDIODIR=$DKML_COMPILE_VS_DIR
@@ -1297,18 +1326,18 @@ autodetect_vsdev() {
         autodetect_vsdev_VSSTUDIOCMAKEGENERATOR=$DKML_COMPILE_VS_CMAKEGENERATOR
     elif [ -n "${VSINSTALLDIR:-}" ] && [ -n "${VCToolsVersion:-}" ] && [ -n "${WindowsSDKVersion:-}" ] && [ -n "${VSCMD_VER:-}" ] && [ -n "${VisualStudioVersion:-}" ]; then
         # ex. VSINSTALLDIR=C:\DiskuvOCaml\BuildTools\ (yes, including the backslash)
-        autodetect_vsdev_VSSTUDIODIR=$(printf "%s" "$VSINSTALLDIR" | "$DKMLSYS_AWK" 'BEGIN{RS="\r\n"} {print; exit}' | "$DKMLSYS_SED" 's#\\$##')
+        autodetect_vsdev_VSSTUDIODIR=$(printf "%s" "$VSINSTALLDIR" | __hermetic_spawn awk 'BEGIN{RS="\r\n"} {print; exit}' | __hermetic_spawn sed 's#\\$##')
         # ex. 14.29.30133 (note: this is different than DKML's vsstudio.vcvars_ver.txt
         # which is only M.N rather than M.N.O)
-        autodetect_vsdev_VSSTUDIOVCVARSVER=$(printf "%s" "$VCToolsVersion" | "$DKMLSYS_AWK" 'BEGIN{RS="\r\n"} {print; exit}')
+        autodetect_vsdev_VSSTUDIOVCVARSVER=$(printf "%s" "$VCToolsVersion" | __hermetic_spawn awk 'BEGIN{RS="\r\n"} {print; exit}')
         # ex. 10.0.19041.0\ (yes, including the backslash)
         #   shellcheck disable=SC2016
-        autodetect_vsdev_VSSTUDIOWINSDKVER=$(printf "%s" "$WindowsSDKVersion" | "$DKMLSYS_AWK" 'BEGIN{RS="\r\n"} {print; exit}' | "$DKMLSYS_SED" 's#\\$##')
+        autodetect_vsdev_VSSTUDIOWINSDKVER=$(printf "%s" "$WindowsSDKVersion" | __hermetic_spawn awk 'BEGIN{RS="\r\n"} {print; exit}' | __hermetic_spawn sed 's#\\$##')
         # ex. VS16.11 from VSCMD_VER=16.11.3
         autodetect_vsdev_VSSTUDIOMSVSPREFERENCE=$(vscmd_ver_to_vsstudio_msvspreference "$VSCMD_VER")
         # VisualStudioVersion=16.0 -> Visual Studio 16 2019
         #   shellcheck disable=SC2016
-        autodetect_vsdev_VSSTUDIOVER=$(printf "%s" "$VisualStudioVersion" | "$DKMLSYS_AWK" 'BEGIN{RS="\r\n"; FS="."} {print $1; exit}')
+        autodetect_vsdev_VSSTUDIOVER=$(printf "%s" "$VisualStudioVersion" | __hermetic_spawn awk 'BEGIN{RS="\r\n"; FS="."} {print $1; exit}')
         case "$autodetect_vsdev_VSSTUDIOVER" in
         11) autodetect_vsdev_VSSTUDIOCMAKEGENERATOR="Visual Studio 11 2012";;
         12) autodetect_vsdev_VSSTUDIOCMAKEGENERATOR="Visual Studio 13 2013";;
@@ -1334,11 +1363,11 @@ autodetect_vsdev() {
         if [ ! -e "$autodetect_vsdev_VSSTUDIO_MSVSPREFERENCEFILE" ]; then return 1; fi
         autodetect_vsdev_VSSTUDIOCMAKEGENERATORFILE="$DKMLPARENTHOME_BUILDHOST/vsstudio.cmake_generator.txt"
         if [ ! -e "$autodetect_vsdev_VSSTUDIOCMAKEGENERATORFILE" ]; then return 1; fi
-        autodetect_vsdev_VSSTUDIODIR=$("$DKMLSYS_AWK" 'BEGIN{RS="\r\n"} {print; exit}' "$autodetect_vsdev_VSSTUDIO_DIRFILE")
-        autodetect_vsdev_VSSTUDIOVCVARSVER=$("$DKMLSYS_AWK" 'BEGIN{RS="\r\n"} {print; exit}' "$autodetect_vsdev_VSSTUDIO_VCVARSVERFILE")
-        autodetect_vsdev_VSSTUDIOWINSDKVER=$("$DKMLSYS_AWK" 'BEGIN{RS="\r\n"} {print; exit}' "$autodetect_vsdev_VSSTUDIO_WINSDKVERFILE")
-        autodetect_vsdev_VSSTUDIOMSVSPREFERENCE=$("$DKMLSYS_AWK" 'BEGIN{RS="\r\n"} {print; exit}' "$autodetect_vsdev_VSSTUDIO_MSVSPREFERENCEFILE")
-        autodetect_vsdev_VSSTUDIOCMAKEGENERATOR=$("$DKMLSYS_AWK" 'BEGIN{RS="\r\n"} {print; exit}' "$autodetect_vsdev_VSSTUDIOCMAKEGENERATORFILE")
+        autodetect_vsdev_VSSTUDIODIR=$(__hermetic_spawn awk 'BEGIN{RS="\r\n"} {print; exit}' "$autodetect_vsdev_VSSTUDIO_DIRFILE")
+        autodetect_vsdev_VSSTUDIOVCVARSVER=$(__hermetic_spawn awk 'BEGIN{RS="\r\n"} {print; exit}' "$autodetect_vsdev_VSSTUDIO_VCVARSVERFILE")
+        autodetect_vsdev_VSSTUDIOWINSDKVER=$(__hermetic_spawn awk 'BEGIN{RS="\r\n"} {print; exit}' "$autodetect_vsdev_VSSTUDIO_WINSDKVERFILE")
+        autodetect_vsdev_VSSTUDIOMSVSPREFERENCE=$(__hermetic_spawn awk 'BEGIN{RS="\r\n"} {print; exit}' "$autodetect_vsdev_VSSTUDIO_MSVSPREFERENCEFILE")
+        autodetect_vsdev_VSSTUDIOCMAKEGENERATOR=$(__hermetic_spawn awk 'BEGIN{RS="\r\n"} {print; exit}' "$autodetect_vsdev_VSSTUDIOCMAKEGENERATORFILE")
     fi
     if [ -x /usr/bin/cygpath ]; then
         autodetect_vsdev_VSSTUDIODIR=$(/usr/bin/cygpath -au "$autodetect_vsdev_VSSTUDIODIR")
@@ -1370,7 +1399,7 @@ create_system_launcher() {
     autodetect_system_binaries
 
     create_system_launcher_OUTPUTDIR=$(__hermetic_spawn dirname "$create_system_launcher_OUTPUTFILE")
-    [ ! -e "$create_system_launcher_OUTPUTDIR" ] && $DKMLSYS_INSTALL -d "$create_system_launcher_OUTPUTDIR" # Avoid 'Operation not permitted' if /tmp
+    [ ! -e "$create_system_launcher_OUTPUTDIR" ] && __hermetic_spawn install -d "$create_system_launcher_OUTPUTDIR" # Avoid 'Operation not permitted' if /tmp
 
     if [ -x /usr/bin/cygpath ]; then
         create_system_launcher_SYSTEMPATHUNIX=$(/usr/bin/cygpath --path "$DKML_SYSTEM_PATH")
@@ -1390,8 +1419,8 @@ create_system_launcher() {
     printf "#!%s\nset -euf\nexec %s%s PATH='%s' %s\n" "$DKML_POSIX_SHELL" "$DKMLSYS_ENV" \
         "$create_system_launcher_ENVARGS" \
         "$create_system_launcher_SYSTEMPATHUNIX" '"$@"' > "$create_system_launcher_OUTPUTFILE".tmp
-    "$DKMLSYS_CHMOD" +x "$create_system_launcher_OUTPUTFILE".tmp
-    "$DKMLSYS_MV" "$create_system_launcher_OUTPUTFILE".tmp "$create_system_launcher_OUTPUTFILE"
+    __hermetic_spawn chmod +x "$create_system_launcher_OUTPUTFILE".tmp
+    __hermetic_spawn mv "$create_system_launcher_OUTPUTFILE".tmp "$create_system_launcher_OUTPUTFILE"
 }
 
 cmake_flag_on() {
@@ -1646,8 +1675,11 @@ autodetect_compiler() {
     fi
     autodetect_compiler_OUTPUTFILE="$1"
     shift
+    # SYNC: autodetect_cpus, create_workdir, install_reproducible_system_packages
     if [ -n "${WORK:-}" ]; then
         autodetect_compiler_TEMPDIR=$WORK
+    elif [ -n "${DK_RUNTIME_DIR:-}" ]; then # dk0, etc.
+        autodetect_compiler_TEMPDIR=$(__hermetic_spawn mktemp -d "$DK_RUNTIME_DIR"/drc/dkmlc.XXXXX)
     elif [ -n "${_CS_DARWIN_USER_TEMP_DIR:-}" ]; then # macOS (see `man mktemp`)
         autodetect_compiler_TEMPDIR=$(__hermetic_spawn mktemp -d "$_CS_DARWIN_USER_TEMP_DIR"/dkmlc.XXXXX)
     elif [ -n "${TMPDIR:-}" ]; then # macOS (see `man mktemp`)
@@ -1732,16 +1764,13 @@ autodetect_compiler() {
     # Set DKML_SYSTEM_PATH
     autodetect_system_path
 
-    # Set DKMLSYS_*
-    autodetect_system_binaries
-
     # Initialize output script and variables in case of failure
     if [ "$autodetect_compiler_OUTPUTMODE" = SEXP ]; then
         printf '()' > "$autodetect_compiler_OUTPUTFILE".tmp
-        "$DKMLSYS_MV" "$autodetect_compiler_OUTPUTFILE".tmp "$autodetect_compiler_OUTPUTFILE"
+        __hermetic_spawn mv "$autodetect_compiler_OUTPUTFILE".tmp "$autodetect_compiler_OUTPUTFILE"
     elif [ "$autodetect_compiler_OUTPUTMODE" = MSVS_DETECT ]; then
         true > "$autodetect_compiler_OUTPUTFILE"
-        "$DKMLSYS_CHMOD" +x "$autodetect_compiler_OUTPUTFILE"
+        __hermetic_spawn chmod +x "$autodetect_compiler_OUTPUTFILE"
     elif [ "$autodetect_compiler_OUTPUTMODE" = LAUNCHER ]; then
         create_system_launcher "$autodetect_compiler_OUTPUTFILE"
     fi
@@ -1775,7 +1804,7 @@ autodetect_compiler() {
 
     if [ "${DKML_BUILD_TRACE:-OFF}" = ON ] && [ "${DKML_BUILD_TRACE_LEVEL:-0}" -ge 2 ] ; then
         printf '@+ autodetect_compiler env\n' >&2
-        "$DKMLSYS_ENV" | "$DKMLSYS_SED" 's/^/@env+| /' | "$DKMLSYS_AWK" '{print}' >&2
+        __hermetic_spawn env | __hermetic_spawn sed 's/^/@env+| /' | __hermetic_spawn awk '{print}' >&2
         printf '@env?| DKML_COMPILE_SPEC=%s\n' "${DKML_COMPILE_SPEC:-}" >&2
         printf '@env?| DKML_COMPILE_TYPE=%s\n' "${DKML_COMPILE_TYPE:-}" >&2
     fi
@@ -1806,12 +1835,12 @@ autodetect_compiler() {
     if [ "${DKML_BUILD_TRACE:-OFF}" = ON ]; then
         autodetect_compiler_OUTPUTBASENAME=$(basename "$autodetect_compiler_OUTPUTFILE")
         printf "@+= autodetect_compiler > %s\n" "$autodetect_compiler_OUTPUTFILE" >&2
-        "$DKMLSYS_SED" 's/^/@'"$autodetect_compiler_OUTPUTBASENAME"'+| /' "$autodetect_compiler_OUTPUTFILE" | "$DKMLSYS_AWK" '{print}' >&2
+        __hermetic_spawn sed 's/^/@'"$autodetect_compiler_OUTPUTBASENAME"'+| /' "$autodetect_compiler_OUTPUTFILE" | __hermetic_spawn awk '{print}' >&2
     fi
 
     # When $WORK is not defined, we have a unique directory that needs cleaning
     if [ -z "${WORK:-}" ]; then
-        $DKMLSYS_RM -rf "$autodetect_compiler_TEMPDIR"
+        __hermetic_spawn rm -rf "$autodetect_compiler_TEMPDIR"
     fi
 }
 
@@ -1820,7 +1849,7 @@ autodetect_compiler() {
 # So if the input is: NAME=VALUE
 # then the output is: NAME" "VALUE
 autodetect_compiler_escape_sexp() {
-    "$DKMLSYS_SED" 's#\\#\\\\#g; s#"#\\"#g; s#=#" "#; ' "$@"
+    __hermetic_spawn sed 's#\\#\\\\#g; s#"#\\"#g; s#=#" "#; ' "$@"
 }
 
 # Since we will embed each name/value pair in single quotes
@@ -1828,7 +1857,7 @@ autodetect_compiler_escape_sexp() {
 # as a single `env` argument like `env 'Z=hi '"'"' there' ...`
 # we need to replace single quotes (') with ('"'"').
 autodetect_compiler_escape_envarg() {
-    "$DKMLSYS_CAT" "$@" | escape_stdin_for_single_quote
+    __hermetic_spawn cat "$@" | escape_stdin_for_single_quote
 }
 
 # Sets _CMAKE_ASM_FLAGS and _CMAKE_(C|ASM|CXX)_FLAGS_FOR_CONFIG environment variables to the value
@@ -1848,7 +1877,7 @@ autodetect_compiler_cmake_get_config_flags() {
     fi
 
     # example command: _CMAKE_C_FLAGS_FOR_CONFIG="$DKML_COMPILE_CM_CMAKE_C_FLAGS_DEBUG"
-    autodetect_compiler_cmake_get_config_flags_CONFIGUPPER=$(printf "%s" "$DKML_COMPILE_CM_CONFIG" | $DKMLSYS_TR '[:lower:]' '[:upper:]')
+    autodetect_compiler_cmake_get_config_flags_CONFIGUPPER=$(printf "%s" "$DKML_COMPILE_CM_CONFIG" | __hermetic_spawn tr '[:lower:]' '[:upper:]')
     {
       printf "_CMAKE_C_FLAGS_FOR_CONFIG=\"\${DKML_COMPILE_CM_CMAKE_C_FLAGS_%s:-}\"\n" "$autodetect_compiler_cmake_get_config_flags_CONFIGUPPER"
       printf "_CMAKE_CXX_FLAGS_FOR_CONFIG=\"\${DKML_COMPILE_CM_CMAKE_CXX_FLAGS_%s:-}\"\n" "$autodetect_compiler_cmake_get_config_flags_CONFIGUPPER"
@@ -1857,7 +1886,7 @@ autodetect_compiler_cmake_get_config_flags() {
     } > "$autodetect_compiler_OUTPUTFILE.flags.source"
     # shellcheck disable=SC1090
     . "$autodetect_compiler_OUTPUTFILE.flags.source"
-    $DKMLSYS_RM -f "$autodetect_compiler_OUTPUTFILE.flags.source"
+    __hermetic_spawn rm -f "$autodetect_compiler_OUTPUTFILE.flags.source"
 }
 
 # Users must use the DKML_TARGET_ABI and DKML_COMPILE_* environment variables so
@@ -1938,6 +1967,9 @@ compiler_clear_environment() {
 #    CFLAGS (etc.) in the launcher script
 # b) Explicitly adding names and values with `export_binding`
 autodetect_compiler_write_output() {
+    # Set DKMLSYS_*
+    autodetect_system_binaries
+
     if [ "$#" -ge 1 ] && [ "$1" = "--has-supplied-post-transform" ]; then
         autodetect_compiler_has_supplied_post_transform=1
         shift
@@ -1993,10 +2025,10 @@ autodetect_compiler_write_output() {
             # The first `sed` command removes any surrounding single quotes from any values.
             # The second `sed` command adds a surrounding parenthesis and double quote ("...") to each value.
             # shellcheck disable=SC2016
-            set | "$DKMLSYS_AWK" 'BEGIN{FS="="} $1 ~ /^DKML_COMPILE_CM_/ {print}' \
-                | "$DKMLSYS_SED" "s/^\([^=]*\)='\(.*\)'$/\1=\2/" \
+            set | __hermetic_spawn awk 'BEGIN{FS="="} $1 ~ /^DKML_COMPILE_CM_/ {print}' \
+                | __hermetic_spawn sed "s/^\([^=]*\)='\(.*\)'$/\1=\2/" \
                 | autodetect_compiler_escape_sexp \
-                | "$DKMLSYS_SED" 's/^/  ("/; s/$/")/'
+                | __hermetic_spawn sed 's/^/  ("/; s/$/")/'
 
             printf ")"
         elif [ "$autodetect_compiler_OUTPUTMODE" = LAUNCHER ]; then
@@ -2049,7 +2081,7 @@ autodetect_compiler_write_output() {
 
             # Passthrough all DKML_COMPILE_CM_* variables
             # shellcheck disable=SC2016
-            set | "$DKMLSYS_AWK" -v bslash="\\\\" 'BEGIN{FS="="} $1 ~ /^DKML_COMPILE_CM_/ {name=$1; value=$0; sub(/^[^=]*=/,"",value); print "  " name "=" value " " bslash}'
+            set | __hermetic_spawn awk -v bslash="\\\\" 'BEGIN{FS="="} $1 ~ /^DKML_COMPILE_CM_/ {name=$1; value=$0; sub(/^[^=]*=/,"",value); print "  " name "=" value " " bslash}'
 
             # Add arguments
             printf "%s\n" '  "$@"'
@@ -2235,8 +2267,8 @@ output_make ()
             printf 'esac\n'
         fi
     } > "$autodetect_compiler_OUTPUTFILE".tmp
-    "$DKMLSYS_CHMOD" +x "$autodetect_compiler_OUTPUTFILE".tmp
-    "$DKMLSYS_MV" "$autodetect_compiler_OUTPUTFILE".tmp "$autodetect_compiler_OUTPUTFILE"
+    __hermetic_spawn chmod +x "$autodetect_compiler_OUTPUTFILE".tmp
+    __hermetic_spawn mv "$autodetect_compiler_OUTPUTFILE".tmp "$autodetect_compiler_OUTPUTFILE"
 }
 
 autodetect_compiler_cmake() {
@@ -2291,8 +2323,8 @@ autodetect_compiler_cmake() {
         else
             autodetect_compiler_cmake_PIC_PIE="${DKML_COMPILE_CM_CMAKE_C_COMPILE_OPTIONS_PIC:-}"
         fi
-        autodetect_compiler_cmake_Specific_CFLAGS=$(printf "%s\n" "$autodetect_compiler_cmake_Specific_CFLAGS${autodetect_compiler_cmake_PIC_PIE:+ $autodetect_compiler_cmake_PIC_PIE}" | $DKMLSYS_SED 's/;/ /g')
-        autodetect_compiler_cmake_Specific_CXXFLAGS=$(printf "%s\n" "$autodetect_compiler_cmake_Specific_CXXFLAGS${autodetect_compiler_cmake_PIC_PIE:+ $autodetect_compiler_cmake_PIC_PIE}" | $DKMLSYS_SED 's/;/ /g')
+        autodetect_compiler_cmake_Specific_CFLAGS=$(printf "%s\n" "$autodetect_compiler_cmake_Specific_CFLAGS${autodetect_compiler_cmake_PIC_PIE:+ $autodetect_compiler_cmake_PIC_PIE}" | __hermetic_spawn sed 's/;/ /g')
+        autodetect_compiler_cmake_Specific_CXXFLAGS=$(printf "%s\n" "$autodetect_compiler_cmake_Specific_CXXFLAGS${autodetect_compiler_cmake_PIC_PIE:+ $autodetect_compiler_cmake_PIC_PIE}" | __hermetic_spawn sed 's/;/ /g')
         if [ "$DKML_COMPILE_CM_CMAKE_SYSTEM_NAME" = "Android" ]; then
             #     For LDFLAGS since CMake does not have a linker pie options variable (ie. CMAKE_LINKER_OPTIONS_PIE) we hardcode it;
             #     we intentionally do not use CMAKE_C_LINK_OPTIONS_PIE since that is for the C compiler (clang) not the linker (ld.lld).
@@ -2426,7 +2458,7 @@ autodetect_compiler_system() {
                 -property installationPath \
                 -latest || true)
             if [ -n "$autodetect_compiler_system_COMPATIBLE_INSTALLDIR" ]; then
-                autodetect_compiler_system_COMPATIBLE_INSTALLDIR=$(printf "%s" "$autodetect_compiler_system_COMPATIBLE_INSTALLDIR" | "$DKMLSYS_AWK" 'BEGIN{RS="\r\n"} {print; exit}')
+                autodetect_compiler_system_COMPATIBLE_INSTALLDIR=$(printf "%s" "$autodetect_compiler_system_COMPATIBLE_INSTALLDIR" | __hermetic_spawn awk 'BEGIN{RS="\r\n"} {print; exit}')
                 autodetect_compiler_vsdev "$autodetect_compiler_system_COMPATIBLE_INSTALLDIR"
                 return # done. [autodetect_compiler_vsdev] wrote the compiler variables
             fi
@@ -2594,10 +2626,10 @@ autodetect_compiler_vsdev() {
         printf "set > %s%s%s%s\n" '"' "$autodetect_compiler_TEMPDIR_WIN" '\vcvars.txt' '"'
     } > "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat
     #   +x for Cygwin (not needed for MSYS2)
-    $DKMLSYS_CHMOD +x "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat
+    __hermetic_spawn chmod +x "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat
     autodetect_compiler_vsdev_dump_script() {
         printf "@+: %s/vsdevcmd-and-printenv.bat\n" "$autodetect_compiler_TEMPDIR" >&2
-        "$DKMLSYS_SED" 's/^/@+| /' "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat | "$DKMLSYS_AWK" '{print}' >&2
+        __hermetic_spawn sed 's/^/@+| /' "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat | __hermetic_spawn awk '{print}' >&2
     }
     if [ "${DKML_BUILD_TRACE:-OFF}" = ON ] && [ "${DKML_BUILD_TRACE_LEVEL:-0}" -ge 2 ]; then
         autodetect_compiler_vsdev_dump_script
@@ -2628,30 +2660,30 @@ autodetect_compiler_vsdev() {
     #    2023 so ARMv7 should be fine.
     if [ -n "${VSDEV_VCVARSVER:-}" ] && [ -n "${VSDEV_WINSDKVER}" ]; then
         autodetect_compiler_vsdev_dump_vars_helper() {
-            rm -f "$autodetect_compiler_TEMPDIR"/vcvars.txt
-            "$DKMLSYS_ENV" PATH="$autodetect_compiler_vsdev_SYSTEMPATHUNIX" __VSCMD_ARG_NO_LOGO=1 VSCMD_SKIP_SENDTELEMETRY=1 VSCMD_DEBUG="$autodetect_compiler_VSCMD_DEBUG" \
+            __hermetic_spawn rm -f "$autodetect_compiler_TEMPDIR"/vcvars.txt
+            __hermetic_spawn env PATH="$autodetect_compiler_vsdev_SYSTEMPATHUNIX" __VSCMD_ARG_NO_LOGO=1 VSCMD_SKIP_SENDTELEMETRY=1 VSCMD_DEBUG="$autodetect_compiler_VSCMD_DEBUG" \
                 "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat \
                 -no_logo -vcvars_ver="$VSDEV_VCVARSVER" -winsdk="$VSDEV_WINSDKVER" "$@" >&2
             if [ ! -e "$autodetect_compiler_TEMPDIR"/vcvars.txt ]; then
                 autodetect_compiler_vsdev_dump_script
                 echo >&2
                 echo "FAILED: $autodetect_compiler_vsdev_INSTALLDIR_BUILDHOST/Common7/Tools/VsDevCmd.bat -no_logo -vcvars_ver=$VSDEV_VCVARSVER -winsdk=$VSDEV_WINSDKVER $*" >&2
-                set | "$DKMLSYS_GREP" "^DKML_COMPILE_" >&2
+                set | __hermetic_spawn grep "^DKML_COMPILE_" >&2
                 echo "DKMLPARENTHOME_BUILDHOST=${DKMLPARENTHOME_BUILDHOST:-}" >&2
                 exit 107
             fi
         }
     else
         autodetect_compiler_vsdev_dump_vars_helper() {
-            rm -f "$autodetect_compiler_TEMPDIR"/vcvars.txt
-            "$DKMLSYS_ENV" PATH="$autodetect_compiler_vsdev_SYSTEMPATHUNIX" __VSCMD_ARG_NO_LOGO=1 VSCMD_SKIP_SENDTELEMETRY=1 VSCMD_DEBUG="$autodetect_compiler_VSCMD_DEBUG" \
+            __hermetic_spawn rm -f "$autodetect_compiler_TEMPDIR"/vcvars.txt
+            __hermetic_spawn env PATH="$autodetect_compiler_vsdev_SYSTEMPATHUNIX" __VSCMD_ARG_NO_LOGO=1 VSCMD_SKIP_SENDTELEMETRY=1 VSCMD_DEBUG="$autodetect_compiler_VSCMD_DEBUG" \
                 "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat \
                 -no_logo "$@" >&2
             if [ ! -e "$autodetect_compiler_TEMPDIR"/vcvars.txt ]; then
                 autodetect_compiler_vsdev_dump_script
                 echo >&2
                 echo "FAILED: $autodetect_compiler_vsdev_INSTALLDIR_BUILDHOST/Common7/Tools/VsDevCmd.bat -no_logo $*" >&2
-                set | "$DKMLSYS_GREP" "^DKML_COMPILE_" >&2
+                set | __hermetic_spawn grep "^DKML_COMPILE_" >&2
                 echo "DKMLPARENTHOME_BUILDHOST=${DKMLPARENTHOME_BUILDHOST:-}" >&2
                 exit 107
             fi
@@ -2764,7 +2796,7 @@ autodetect_compiler_vsdev() {
     # - HOME* (HOME, HOMEDRIVE, HOMEPATH)
     # - USER* (USERNAME, USERPROFILE, USERDOMAIN, USERDOMAIN_ROAMINGPROFILE)
     # shellcheck disable=SC2016
-    "$DKMLSYS_AWK" '
+    __hermetic_spawn awk '
     BEGIN{FS="="}
 
     $1 != "PATH" &&
@@ -2801,7 +2833,7 @@ autodetect_compiler_vsdev() {
 
     # FIFTH, set autodetect_compiler_COMPILER_PATH to the provided PATH
     # shellcheck disable=SC2016
-    "$DKMLSYS_AWK" '
+    __hermetic_spawn awk '
     BEGIN{FS="="}
 
     $1 == "PATH" {name=$1; value=$0; sub(/^[^=]*=/,"",value); print value}
@@ -2810,15 +2842,15 @@ autodetect_compiler_vsdev() {
         # shellcheck disable=SC2086
         /usr/bin/cygpath --path -f - < "$autodetect_compiler_TEMPDIR/winpath.txt" > "$autodetect_compiler_TEMPDIR"/unixpath.txt
     else
-        cp "$autodetect_compiler_TEMPDIR/winpath.txt" "$autodetect_compiler_TEMPDIR"/unixpath.txt
+        __hermetic_spawn cp "$autodetect_compiler_TEMPDIR/winpath.txt" "$autodetect_compiler_TEMPDIR"/unixpath.txt
     fi
     # shellcheck disable=SC2034
-    autodetect_compiler_COMPILER_PATH_UNIX=$("$DKMLSYS_CAT" "$autodetect_compiler_TEMPDIR"/unixpath.txt)
-    autodetect_compiler_COMPILER_PATH_WIN=$("$DKMLSYS_CAT" "$autodetect_compiler_TEMPDIR"/winpath.txt)
+    autodetect_compiler_COMPILER_PATH_UNIX=$(__hermetic_spawn cat "$autodetect_compiler_TEMPDIR"/unixpath.txt)
+    autodetect_compiler_COMPILER_PATH_WIN=$(__hermetic_spawn cat "$autodetect_compiler_TEMPDIR"/winpath.txt)
 
     # VERIFY: make sure VsDevCmd.bat gave us the correct target assembler (which have unique names per target architecture)
     # shellcheck disable=SC2016
-    autodetect_compiler_TGTARCH=$("$DKMLSYS_AWK" '
+    autodetect_compiler_TGTARCH=$(__hermetic_spawn awk '
         BEGIN{FS="="} $1 == "VSCMD_ARG_TGT_ARCH" {name=$1; value=$0; sub(/^[^=]*=/,"",value);                print value}
         ' "$autodetect_compiler_TEMPDIR"/vcvars.txt)
     if ! PATH="$autodetect_compiler_COMPILER_PATH_UNIX" "$autodetect_compiler_vsdev_VALIDATE_ASM" -help >/dev/null 2>/dev/null; then
@@ -2844,10 +2876,10 @@ autodetect_compiler_vsdev() {
     # SIXTH, set autodetect_compiler_COMPILER_UNIQ_PATH so that it is only the _unique_ entries
     # (the set {autodetect_compiler_COMPILER_UNIQ_PATH} - {DKML_SYSTEM_PATH}) are used. But maintain the order
     # that Microsoft places each path entry.
-    printf "%s\n" "$autodetect_compiler_COMPILER_PATH_UNIX" | "$DKMLSYS_AWK" 'BEGIN{RS=":"} {print}' > "$autodetect_compiler_TEMPDIR"/vcvars_entries_unix.txt
-    "$DKMLSYS_SORT" -u "$autodetect_compiler_TEMPDIR"/vcvars_entries_unix.txt > "$autodetect_compiler_TEMPDIR"/vcvars_entries_unix.sortuniq.txt
-    printf "%s\n" "$DKML_SYSTEM_PATH" | "$DKMLSYS_AWK" 'BEGIN{RS=":"} {print}' | "$DKMLSYS_SORT" -u > "$autodetect_compiler_TEMPDIR"/path.sortuniq.txt
-    "$DKMLSYS_COMM" \
+    printf "%s\n" "$autodetect_compiler_COMPILER_PATH_UNIX" | __hermetic_spawn awk 'BEGIN{RS=":"} {print}' > "$autodetect_compiler_TEMPDIR"/vcvars_entries_unix.txt
+    __hermetic_spawn sort -u "$autodetect_compiler_TEMPDIR"/vcvars_entries_unix.txt > "$autodetect_compiler_TEMPDIR"/vcvars_entries_unix.sortuniq.txt
+    printf "%s\n" "$DKML_SYSTEM_PATH" | __hermetic_spawn awk 'BEGIN{RS=":"} {print}' | __hermetic_spawn sort -u > "$autodetect_compiler_TEMPDIR"/path.sortuniq.txt
+    __hermetic_spawn comm \
         -23 \
         "$autodetect_compiler_TEMPDIR"/vcvars_entries_unix.sortuniq.txt \
         "$autodetect_compiler_TEMPDIR"/path.sortuniq.txt \
@@ -2855,7 +2887,7 @@ autodetect_compiler_vsdev() {
     autodetect_compiler_COMPILER_UNIX_UNIQ_PATH=
     while IFS='' read -r autodetect_compiler_line; do
         # if and only if the $autodetect_compiler_line matches one of the lines in vcvars_uniq.txt
-        if ! printf "%s\n" "$autodetect_compiler_line" | "$DKMLSYS_COMM" -12 - "$autodetect_compiler_TEMPDIR"/vcvars_uniq.txt | "$DKMLSYS_AWK" 'NF>0{exit 1}'; then
+        if ! printf "%s\n" "$autodetect_compiler_line" | __hermetic_spawn comm -12 - "$autodetect_compiler_TEMPDIR"/vcvars_uniq.txt | __hermetic_spawn awk 'NF>0{exit 1}'; then
             if [ -z "$autodetect_compiler_COMPILER_UNIX_UNIQ_PATH" ]; then
                 autodetect_compiler_COMPILER_UNIX_UNIQ_PATH="$autodetect_compiler_line"
             else
@@ -2891,49 +2923,49 @@ autodetect_compiler_vsdev() {
 
     # === autodetect_compiler_MSVS_NAME
     # shellcheck disable=SC2016
-    "$DKMLSYS_AWK" '
+    __hermetic_spawn awk '
     BEGIN{FS="="} $1 == "VSCMD_VER" {name=$1; value=$0; sub(/^[^=]*=/,"",value);                print "Visual Studio " value}
     ' "$autodetect_compiler_TEMPDIR"/vcvars.txt > "$autodetect_compiler_TEMPDIR"/msvs1.txt
     # shellcheck disable=SC2016
-    "$DKMLSYS_AWK" '
+    __hermetic_spawn awk '
     BEGIN{FS="="}
     $1 == "VCToolsVersion" {name=$1; value=$0; sub(/^[^=]*=/,"",value);                         print "VC Tools " value}
     ' "$autodetect_compiler_TEMPDIR"/vcvars.txt > "$autodetect_compiler_TEMPDIR"/msvs2.txt
     # shellcheck disable=SC2016
-    "$DKMLSYS_AWK" '
+    __hermetic_spawn awk '
     BEGIN{FS="="}
     $1 == "WindowsSDKVersion" {name=$1; value=$0; sub(/^[^=]*=/,"",value); sub(/\\$/,"",value); print "Windows SDK " value}
     ' "$autodetect_compiler_TEMPDIR"/vcvars.txt > "$autodetect_compiler_TEMPDIR"/msvs3.txt
     # shellcheck disable=SC2016
-    "$DKMLSYS_AWK" '
+    __hermetic_spawn awk '
     BEGIN{FS="="} $1 == "VSCMD_ARG_HOST_ARCH" {name=$1; value=$0; sub(/^[^=]*=/,"",value);      print "Host " value}
     ' "$autodetect_compiler_TEMPDIR"/vcvars.txt > "$autodetect_compiler_TEMPDIR"/msvs4.txt
     # shellcheck disable=SC2016
-    "$DKMLSYS_AWK" '
+    __hermetic_spawn awk '
     BEGIN{FS="="} $1 == "VSCMD_ARG_TGT_ARCH" {name=$1; value=$0; sub(/^[^=]*=/,"",value);       print "Target " value}
     ' "$autodetect_compiler_TEMPDIR"/vcvars.txt > "$autodetect_compiler_TEMPDIR"/msvs5.txt
-    autodetect_compiler_MSVS1=$($DKMLSYS_CAT "$autodetect_compiler_TEMPDIR"/msvs1.txt)
-    autodetect_compiler_MSVS2=$($DKMLSYS_CAT "$autodetect_compiler_TEMPDIR"/msvs2.txt)
-    autodetect_compiler_MSVS3=$($DKMLSYS_CAT "$autodetect_compiler_TEMPDIR"/msvs3.txt)
-    autodetect_compiler_MSVS4=$($DKMLSYS_CAT "$autodetect_compiler_TEMPDIR"/msvs4.txt)
-    autodetect_compiler_MSVS5=$($DKMLSYS_CAT "$autodetect_compiler_TEMPDIR"/msvs5.txt)
+    autodetect_compiler_MSVS1=$(__hermetic_spawn cat "$autodetect_compiler_TEMPDIR"/msvs1.txt)
+    autodetect_compiler_MSVS2=$(__hermetic_spawn cat "$autodetect_compiler_TEMPDIR"/msvs2.txt)
+    autodetect_compiler_MSVS3=$(__hermetic_spawn cat "$autodetect_compiler_TEMPDIR"/msvs3.txt)
+    autodetect_compiler_MSVS4=$(__hermetic_spawn cat "$autodetect_compiler_TEMPDIR"/msvs4.txt)
+    autodetect_compiler_MSVS5=$(__hermetic_spawn cat "$autodetect_compiler_TEMPDIR"/msvs5.txt)
     autodetect_compiler_MSVS_NAME="$autodetect_compiler_MSVS1 $autodetect_compiler_MSVS4 $autodetect_compiler_MSVS5 $autodetect_compiler_MSVS2 $autodetect_compiler_MSVS3 $autodetect_compiler_vsdev_INSTALLDIR_BUILDHOST"
 
     # === autodetect_compiler_MSVS_INC
     # shellcheck disable=SC2016
-    autodetect_compiler_MSVS_INC=$("$DKMLSYS_AWK" '
+    autodetect_compiler_MSVS_INC=$(__hermetic_spawn awk '
     BEGIN{FS="="} $1 == "INCLUDE" {name=$1; value=$0; sub(/^[^=]*=/,"",value); print value}
     ' "$autodetect_compiler_TEMPDIR"/vcvars.txt)
 
     # === autodetect_compiler_MSVS_LIB
     # shellcheck disable=SC2016
-    autodetect_compiler_MSVS_LIB=$("$DKMLSYS_AWK" '
+    autodetect_compiler_MSVS_LIB=$(__hermetic_spawn awk '
     BEGIN{FS="="} $1 == "LIB" {name=$1; value=$0; sub(/^[^=]*=/,"",value);     print value}
     ' "$autodetect_compiler_TEMPDIR"/vcvars.txt)
 
     # === autodetect_compiler_vsdev_VSCMD_VER
     # shellcheck disable=SC2016
-    "$DKMLSYS_AWK" '
+    __hermetic_spawn awk '
     BEGIN{FS="="} $1 == "VSCMD_VER" {name=$1; value=$0; sub(/^[^=]*=/,"",value);    print value}
     ' "$autodetect_compiler_TEMPDIR"/vcvars.txt > "$autodetect_compiler_TEMPDIR"/VSCMD_VER.txt
 
@@ -3060,19 +3092,18 @@ autodetect_withdkmlexe() {
 #   - env:DKML_POSIX_SHELL - The path to the POSIX shell. Only set if it wasn't already
 #     set.
 log_shell() {
-    autodetect_system_binaries
     autodetect_posix_shell
     if [ "${DKML_BUILD_TRACE:-OFF}" = ON ]; then
         printf "%s\n" "@+ $DKML_POSIX_SHELL $*" >&2
         # If trace level > 2 and the first argument is a _non binary_ file then print contents
-        if [ "${DKML_BUILD_TRACE_LEVEL:-0}" -ge 2 ] && [ -e "$1" ] && "$DKMLSYS_GREP" -qI . "$1"; then
+        if [ "${DKML_BUILD_TRACE_LEVEL:-0}" -ge 2 ] && [ -e "$1" ] && __hermetic_spawn grep -qI . "$1"; then
             log_shell_1="$1"
             shift
             # print args with prefix ... @+:
-            escape_args_for_shell "$@" | "$DKMLSYS_SED" 's/^/@+: /' >&2
+            escape_args_for_shell "$@" | __hermetic_spawn sed 's/^/@+: /' >&2
             printf "\n" >&2
             # print file with prefix ... @+| . Also make sure each line is newline terminated using awk.
-            "$DKMLSYS_SED" 's/^/@+| /' "$log_shell_1" | "$DKMLSYS_AWK" '{print}' >&2
+            __hermetic_spawn sed 's/^/@+| /' "$log_shell_1" | __hermetic_spawn awk '{print}' >&2
             "$DKML_POSIX_SHELL" -eufx "$log_shell_1" "$@"
         else
             "$DKML_POSIX_SHELL" -eufx "$@"
@@ -3085,7 +3116,7 @@ log_shell() {
 # A function that will try to print an ISO8601 timestamp, but will fallback to
 # the system default. Always uses UTC timezone.
 try_iso8601_timestamp() {
-    date -u -Iseconds 2>/dev/null || TZ=UTC date
+    __hermetic_spawn date -u -Iseconds 2>/dev/null || TZ=UTC __hermetic_spawn date
 }
 
 # A function that will print the command and possibly time it (if and only if it uses a full path to
@@ -3146,20 +3177,19 @@ sha256compute() {
         sha256compute_FILE=$(/usr/bin/cygpath -a "$sha256compute_FILE")
     fi
 
-    autodetect_system_binaries
     if [ -x /usr/bin/shasum ]; then # macOS, OpenBSD, Debian
         # CODESITE #1 (duplicates elsewhere).
         # On Debian shasum is a perl script, and perl needs locale settings or it will complain.
         # Confer: https://www.thomas-krenn.com/en/wiki/Perl_warning_Setting_locale_failed_in_Debian
         # Confer: https://stackoverflow.com/a/52004330/21513816
         #   shellcheck disable=SC2016
-        LC_ALL=C /usr/bin/shasum -a 256 "$sha256compute_FILE" | "$DKMLSYS_AWK" '{print $1}'
+        LC_ALL=C /usr/bin/shasum -a 256 "$sha256compute_FILE" | __hermetic_spawn awk '{print $1}'
     elif [ -x /usr/bin/sha256sum ]; then # Linux, MSYS2
         #   shellcheck disable=SC2016
-        /usr/bin/sha256sum "$sha256compute_FILE" | "$DKMLSYS_AWK" '{print $1}'
+        /usr/bin/sha256sum "$sha256compute_FILE" | __hermetic_spawn awk '{print $1}'
     elif [ -x /sbin/sha256 ]; then # FreeBSD
         #   shellcheck disable=SC2016
-        /sbin/sha256 -r "$sha256compute_FILE" | "$DKMLSYS_AWK" '{print $1}'
+        /sbin/sha256 -r "$sha256compute_FILE" | __hermetic_spawn awk '{print $1}'
     else
         printf "FATAL: %s\n" "No sha256 checksum utility found" >&2
         exit 107
@@ -3210,7 +3240,7 @@ sha256check() {
 cachekey_for_filename() {
     cachekey_for_filename_FILE=$1
     shift
-    sha256compute "$cachekey_for_filename_FILE" | cut -c 1-10
+    sha256compute "$cachekey_for_filename_FILE" | __hermetic_spawn cut -c 1-10
 }
 
 # [downloadfile URL FILE SUM] downloads from URL into FILE and verifies the SHA256 checksum of SUM.
@@ -3224,14 +3254,14 @@ downloadfile() {
     downloadfile_SUM="$1"
     shift
 
-    # Set DKMLSYS_*
-    autodetect_system_binaries
+    # Set DKMLSYS_CURL and DKMLSYS_WGET
+    autodetect_system_fetchers
 
     if [ -e "$downloadfile_FILE" ]; then
         if sha256check "$downloadfile_FILE" "$downloadfile_SUM"; then
             return 0
         else
-            $DKMLSYS_RM -f "$downloadfile_FILE"
+            __hermetic_spawn rm -f "$downloadfile_FILE"
         fi
     fi
     if [ "${CI:-}" = true ]; then
@@ -3257,7 +3287,7 @@ downloadfile() {
         printf "%s\n" "FATAL: Encountered a corrupted or compromised download from $downloadfile_URL" >&2
         exit 1
     fi
-    $DKMLSYS_MV "$downloadfile_FILE".tmp "$downloadfile_FILE"
+    __hermetic_spawn mv "$downloadfile_FILE".tmp "$downloadfile_FILE"
 }
 
 # DEPRECATED
@@ -3273,17 +3303,22 @@ escape_string_for_shell() {
     escape_string_for_shell_STR="$1"
     shift
     # We'll use the bash or dash builtin `set` which escapes spaces and quotes correctly.
-    set | grep ^escape_string_for_shell_STR= | sed 's/[^=]*=//'
+    set | __hermetic_spawn grep ^escape_string_for_shell_STR= | __hermetic_spawn sed 's/[^=]*=//'
 }
+
+__escape_shell() { printf "'%s'\\n" "$(printf '%s' "$1" | __hermetic_spawn sed -e "s/'/'\\\\''/g")"; }
 
 # escape_args_for_shell ARG1 ARG2 ...
 #
-# If `escape_args_for_shell asd sdfs 'hello there'` then prints `asd sdfs hello\ there`
-#
-# Prereq: autodetect_system_binaries
+# If `escape_args_for_shell asd sdfs 'hello there'` then prints `'asd' 'sdfs' 'hello there'`
+# 
 escape_args_for_shell() {
     # Confer %q in https://www.gnu.org/software/bash/manual/bash.html#Shell-Builtin-Commands
-    bash -c 'printf "%q " "$@"' -- "$@" | $DKMLSYS_SED 's/ $//'
+    # But since no bash, we could use https://www.shellcheck.net/wiki/SC3050
+    ##bash -c 'printf "%q " "$@"' -- "$@" | __hermetic_spawn sed 's/ $//' # produces `asd sdfs hello\ there`
+    for escape_args_for_shell_arg in "$@"; do
+        __escape_shell "$escape_args_for_shell_arg"
+    done | __hermetic_spawn paste -sd ' ' -
 }
 
 # Make the standard input embeddable in single quotes
@@ -3291,21 +3326,17 @@ escape_args_for_shell() {
 # That is, replace single quotes (') with ('"'"').
 #
 # It is your responsibility to place outer single quotes around the stdout.
-#
-# Prereq: autodetect_system_binaries
 escape_stdin_for_single_quote() {
-    "$DKMLSYS_SED" "s#'#'\"'\"'#g"
+    __hermetic_spawn sed "s#'#'\"'\"'#g"
 }
 
 # Make the standard input work as an OCaml string.
 #
 # This currently only escapes backslashes and double quotes.
-#
-# Prereq: autodetect_system_binaries
 escape_arg_as_ocaml_string() {
     escape_arg_as_ocaml_string_ARG=$1
     shift
-    printf "%s" "$escape_arg_as_ocaml_string_ARG" | "$DKMLSYS_SED" 's#\\#\\\\#g; s#"#\\"#g;'
+    printf "%s" "$escape_arg_as_ocaml_string_ARG" | __hermetic_spawn sed 's#\\#\\\\#g; s#"#\\"#g;'
 }
 
 # Convert a path into an absolute path appropriate for the build host machine. That is, Windows
@@ -3440,12 +3471,12 @@ spawn_rsync() {
         rsync "$@"
     else
         # test whether --info=progress2 works
-        spawn_rsync_D1=$(mktemp -d "$WORK"/tmp.XXXXXXXXXX)
-        spawn_rsync_D2=$(mktemp -d "$WORK"/tmp.XXXXXXXXXX)
+        spawn_rsync_D1=$(__hermetic_spawn mktemp -d "$WORK"/tmp.XXXXXXXXXX)
+        spawn_rsync_D2=$(__hermetic_spawn mktemp -d "$WORK"/tmp.XXXXXXXXXX)
         spawn_rsync_IP2=ON
         rsync -ap --info=progress2 "$spawn_rsync_D1"/ "$spawn_rsync_D2" 2>/dev/null >/dev/null || spawn_rsync_IP2=OFF
-        rm -rf "$spawn_rsync_D2"
-        rm -rf "$spawn_rsync_D1"
+        __hermetic_spawn rm -rf "$spawn_rsync_D2"
+        __hermetic_spawn rm -rf "$spawn_rsync_D1"
 
         if [ "$spawn_rsync_IP2" = ON ]; then
             rsync --info=progress2 --human-readable "$@"
@@ -3466,6 +3497,7 @@ create_workdir() {
     # Our use of mktemp needs to be portable; docs at:
     # * BSD: https://www.freebsd.org/cgi/man.cgi?query=mktemp&sektion=1
     # * GNU: https://www.gnu.org/software/autogen/mktemp.html
+    # SYNC: autodetect_cpus, create_workdir, install_reproducible_system_packages
     if [ -n "${DK_RUNTIME_DIR:-}" ]; then # dk0, etc.
         make_workdir_DEFAULT="$DK_RUNTIME_DIR/drc"
     elif [ -n "${_CS_DARWIN_USER_TEMP_DIR:-}" ]; then # macOS (see `man mktemp`)

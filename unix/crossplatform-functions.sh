@@ -264,7 +264,7 @@ __autodetect_system_path_push_git() {
     # Add Git at beginning of PATH
     autodetect_system_path_GITEXE=$(command -v git || true)
     if [ -n "$autodetect_system_path_GITEXE" ]; then
-        autodetect_system_path_GITDIR=$(PATH=/usr/bin:/bin dirname "$autodetect_system_path_GITEXE")
+        autodetect_system_path_GITDIR=$(PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin dirname "$autodetect_system_path_GITEXE")
         case "$autodetect_system_path_GITDIR" in
             /usr/bin|/bin)
                 # __autodetect_system_path_push_usr_bin is responsible for
@@ -280,7 +280,7 @@ __autodetect_system_path_push_git() {
                 # but need the better directory:
                 #    ~/scoop/apps/git/current/cmd/git.exe
                 #    <no bash.exe!>
-                autodetect_system_path_GITGRANDDIR=$(PATH=/usr/bin:/bin dirname "$autodetect_system_path_GITDIR")
+                autodetect_system_path_GITGRANDDIR=$(PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin dirname "$autodetect_system_path_GITDIR")
                 if [ -x "$autodetect_system_path_GITGRANDDIR/apps/git/current/cmd/git.exe" ]; then
                     autodetect_system_path_GITDIR="$autodetect_system_path_GITGRANDDIR/apps/git/current/cmd"
                 fi
@@ -297,12 +297,12 @@ __autodetect_system_path_push_usr_bin() {
     __autodetect_system_path_push_usr_bin_PATH=
 
     if is_cygwin_build_machine; then
-        __autodetect_system_path_push_usr_bin_PATH=/usr/bin:/bin
+        __autodetect_system_path_push_usr_bin_PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin
     elif is_msys2_msys_build_machine; then
         # /bin is a mount (essentially a symlink) to /usr/bin on MSYS2
         __autodetect_system_path_push_usr_bin_PATH=/usr/bin
     else
-        __autodetect_system_path_push_usr_bin_PATH=/usr/bin:/bin
+        __autodetect_system_path_push_usr_bin_PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin
     fi
 
     if [ -n "${DKML_SYSTEM_PATH:-}" ]; then
@@ -430,98 +430,126 @@ autodetect_system_path_with_git_before_usr_bin() {
 # - env:DKMLSYS_TR - Location of `tr`
 autodetect_system_binaries() {
     if [ -z "${DKMLSYS_MV:-}" ]; then
-        if [ -x /usr/bin/mv ]; then
+        if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "${DK_UNIX_ESSENTIALS}/bin/mv" ]; then
+            DKMLSYS_MV="${DK_UNIX_ESSENTIALS}/bin/mv"
+        elif [ -x /usr/bin/mv ]; then
             DKMLSYS_MV=/usr/bin/mv
         else
             DKMLSYS_MV=/bin/mv
         fi
     fi
     if [ -z "${DKMLSYS_CHMOD:-}" ]; then
-        if [ -x /usr/bin/chmod ]; then
+        if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "${DK_UNIX_ESSENTIALS}/bin/chmod" ]; then
+            DKMLSYS_CHMOD="${DK_UNIX_ESSENTIALS}/bin/chmod"
+        elif [ -x /usr/bin/chmod ]; then
             DKMLSYS_CHMOD=/usr/bin/chmod
         else
             DKMLSYS_CHMOD=/bin/chmod
         fi
     fi
     if [ -z "${DKMLSYS_UNAME:-}" ]; then
-        if [ -x /usr/bin/uname ]; then
+        if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "${DK_UNIX_ESSENTIALS}/bin/uname" ]; then
+            DKMLSYS_UNAME="${DK_UNIX_ESSENTIALS}/bin/uname"
+        elif [ -x /usr/bin/uname ]; then
             DKMLSYS_UNAME=/usr/bin/uname
         else
             DKMLSYS_UNAME=/bin/uname
         fi
     fi
     if [ -z "${DKMLSYS_ENV:-}" ]; then
-        if [ -x /usr/bin/env ]; then
+        if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "${DK_UNIX_ESSENTIALS}/bin/env" ]; then
+            DKMLSYS_ENV="${DK_UNIX_ESSENTIALS}/bin/env"
+        elif [ -x /usr/bin/env ]; then
             DKMLSYS_ENV=/usr/bin/env
         else
             DKMLSYS_ENV=/bin/env
         fi
     fi
     if [ -z "${DKMLSYS_AWK:-}" ]; then
-        if [ -x /usr/bin/awk ]; then
+        if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "${DK_UNIX_ESSENTIALS}/bin/awk" ]; then
+            DKMLSYS_AWK="${DK_UNIX_ESSENTIALS}/bin/awk"
+        elif [ -x /usr/bin/awk ]; then
             DKMLSYS_AWK=/usr/bin/awk
         else
             DKMLSYS_AWK=/bin/awk
         fi
     fi
     if [ -z "${DKMLSYS_SED:-}" ]; then
-        if [ -x /usr/bin/sed ]; then
+        if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "${DK_UNIX_ESSENTIALS}/bin/sed" ]; then
+            DKMLSYS_SED="${DK_UNIX_ESSENTIALS}/bin/sed"
+        elif [ -x /usr/bin/sed ]; then
             DKMLSYS_SED=/usr/bin/sed
         else
             DKMLSYS_SED=/bin/sed
         fi
     fi
     if [ -z "${DKMLSYS_COMM:-}" ]; then
-        if [ -x /usr/bin/comm ]; then
+        if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "${DK_UNIX_ESSENTIALS}/bin/comm" ]; then
+            DKMLSYS_COMM="${DK_UNIX_ESSENTIALS}/bin/comm"
+        elif [ -x /usr/bin/comm ]; then
             DKMLSYS_COMM=/usr/bin/comm
         else
             DKMLSYS_COMM=/bin/comm
         fi
     fi
     if [ -z "${DKMLSYS_INSTALL:-}" ]; then
-        if [ -x /usr/bin/install ]; then
+        if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "${DK_UNIX_ESSENTIALS}/bin/install" ]; then
+            DKMLSYS_INSTALL="${DK_UNIX_ESSENTIALS}/bin/install"
+        elif [ -x /usr/bin/install ]; then
             DKMLSYS_INSTALL=/usr/bin/install
         else
             DKMLSYS_INSTALL=/bin/install
         fi
     fi
     if [ -z "${DKMLSYS_RM:-}" ]; then
-        if [ -x /usr/bin/rm ]; then
+        if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "${DK_UNIX_ESSENTIALS}/bin/rm" ]; then
+            DKMLSYS_RM="${DK_UNIX_ESSENTIALS}/bin/rm"
+        elif [ -x /usr/bin/rm ]; then
             DKMLSYS_RM=/usr/bin/rm
         else
             DKMLSYS_RM=/bin/rm
         fi
     fi
     if [ -z "${DKMLSYS_SORT:-}" ]; then
-        if [ -x /usr/bin/sort ]; then
+        if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "${DK_UNIX_ESSENTIALS}/bin/sort" ]; then
+            DKMLSYS_SORT="${DK_UNIX_ESSENTIALS}/bin/sort"
+        elif [ -x /usr/bin/sort ]; then
             DKMLSYS_SORT=/usr/bin/sort
         else
             DKMLSYS_SORT=/bin/sort
         fi
     fi
     if [ -z "${DKMLSYS_CAT:-}" ]; then
-        if [ -x /usr/bin/cat ]; then
+        if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "${DK_UNIX_ESSENTIALS}/bin/cat" ]; then
+            DKMLSYS_CAT="${DK_UNIX_ESSENTIALS}/bin/cat"
+        elif [ -x /usr/bin/cat ]; then
             DKMLSYS_CAT=/usr/bin/cat
         else
             DKMLSYS_CAT=/bin/cat
         fi
     fi
     if [ -z "${DKMLSYS_STAT:-}" ]; then
-        if [ -x /usr/bin/stat ]; then
+        if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "${DK_UNIX_ESSENTIALS}/bin/stat" ]; then
+            DKMLSYS_STAT="${DK_UNIX_ESSENTIALS}/bin/stat"
+        elif [ -x /usr/bin/stat ]; then
             DKMLSYS_STAT=/usr/bin/stat
         else
             DKMLSYS_STAT=/bin/stat
         fi
     fi
     if [ -z "${DKMLSYS_GREP:-}" ]; then
-        if [ -x /usr/bin/grep ]; then
+        if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "${DK_UNIX_ESSENTIALS}/bin/grep" ]; then
+            DKMLSYS_GREP="${DK_UNIX_ESSENTIALS}/bin/grep"
+        elif [ -x /usr/bin/grep ]; then
             DKMLSYS_GREP=/usr/bin/grep
         else
             DKMLSYS_GREP=/bin/grep
         fi
     fi
     if [ -z "${DKMLSYS_CURL:-}" ]; then
-        if [ -x /usr/bin/curl ]; then
+        if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "${DK_UNIX_ESSENTIALS}/bin/curl" ]; then
+            DKMLSYS_CURL="${DK_UNIX_ESSENTIALS}/bin/curl"
+        elif [ -x /usr/bin/curl ]; then
             DKMLSYS_CURL=/usr/bin/curl
         elif [ -x /bin/curl ]; then
             DKMLSYS_CURL=/bin/curl
@@ -530,7 +558,9 @@ autodetect_system_binaries() {
         fi
     fi
     if [ -z "${DKMLSYS_WGET:-}" ]; then
-        if [ -x /usr/bin/wget ]; then
+        if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "${DK_UNIX_ESSENTIALS}/bin/wget" ]; then
+            DKMLSYS_WGET="${DK_UNIX_ESSENTIALS}/bin/wget"
+        elif [ -x /usr/bin/wget ]; then
             DKMLSYS_WGET=/usr/bin/wget
         elif [ -x /bin/wget ]; then
             DKMLSYS_WGET=/bin/wget
@@ -539,7 +569,9 @@ autodetect_system_binaries() {
         fi
     fi
     if [ -z "${DKMLSYS_TR:-}" ]; then
-        if [ -x /usr/bin/tr ]; then
+        if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "${DK_UNIX_ESSENTIALS}/bin/tr" ]; then
+            DKMLSYS_TR="${DK_UNIX_ESSENTIALS}/bin/tr"
+        elif [ -x /usr/bin/tr ]; then
             DKMLSYS_TR=/usr/bin/tr
         else
             DKMLSYS_TR=/bin/tr
@@ -969,6 +1001,10 @@ install_reproducible_system_packages() {
     elif [ -n "${DEFAULT_DOCKCROSS_IMAGE:-}" ] || [ -e /dockcross ]; then
         true > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
         printf "#!/bin/sh\necho Run from inside the %s Docker container\n" "${DEFAULT_DOCKCROSS_IMAGE:-dockcross}" > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"
+    elif [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "$DK_UNIX_ESSENTIALS/bin/busybox" ]; then
+        # The dk0 build system W64dev kit has Busybox for a POSIX shell on Windows.
+        true > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
+        printf "#!/bin/sh\necho A dk0 build command is required to run the remaining scripts\n" > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"
     elif [ -x /bin/busybox ]; then
         # minimal Alpine (often a minimal Docker container)
         true > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
@@ -1013,12 +1049,12 @@ install_reproducible_script_with_args() {
         printf "set -euf\n"
         # shellcheck disable=SC2016
         printf 'if [ "${DKML_BUILD_TRACE:-}" = ON ] && [ "${DKML_BUILD_TRACE_LEVEL:-0}" -ge 2 ]; then\n'
-        printf "  exec bash -x %s " \
+        printf "  exec sh -x %s " \
             "$install_reproducible_script_with_args_BOOTSTRAPRELDIR/$install_reproducible_script_with_args_SCRIPTFILE"
         escape_args_for_shell "$@"
         printf "\n"
         printf "else\n"
-        printf "  exec %s " \
+        printf "  exec sh %s " \
             "$install_reproducible_script_with_args_BOOTSTRAPRELDIR/$install_reproducible_script_with_args_SCRIPTFILE"
         escape_args_for_shell "$@"
         printf "\n"
@@ -1258,6 +1294,7 @@ autodetect_vsdev() {
         15) autodetect_vsdev_VSSTUDIOCMAKEGENERATOR="Visual Studio 15 2017";;
         16) autodetect_vsdev_VSSTUDIOCMAKEGENERATOR="Visual Studio 16 2019";;
         17) autodetect_vsdev_VSSTUDIOCMAKEGENERATOR="Visual Studio 17 2022";;
+        18) autodetect_vsdev_VSSTUDIOCMAKEGENERATOR="Visual Studio 18 2026";;
         *)
           printf "ERROR: VisualStudioVersion=%s is not handled by autodetect_vsdev of crossplatform-functions.sh\n" "$VisualStudioVersion" >&2
           return 1
@@ -1310,7 +1347,7 @@ create_system_launcher() {
     # Set DKMLSYS_*
     autodetect_system_binaries
 
-    create_system_launcher_OUTPUTDIR=$(PATH=/usr/bin:/bin dirname "$create_system_launcher_OUTPUTFILE")
+    create_system_launcher_OUTPUTDIR=$(PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin dirname "$create_system_launcher_OUTPUTFILE")
     [ ! -e "$create_system_launcher_OUTPUTDIR" ] && $DKMLSYS_INSTALL -d "$create_system_launcher_OUTPUTDIR" # Avoid 'Operation not permitted' if /tmp
 
     if [ -x /usr/bin/cygpath ]; then
@@ -1590,14 +1627,14 @@ autodetect_compiler() {
     if [ -n "${WORK:-}" ]; then
         autodetect_compiler_TEMPDIR=$WORK
     elif [ -n "${_CS_DARWIN_USER_TEMP_DIR:-}" ]; then # macOS (see `man mktemp`)
-        autodetect_compiler_TEMPDIR=$(PATH=/usr/bin:/bin mktemp -d "$_CS_DARWIN_USER_TEMP_DIR"/dkmlc.XXXXX)
+        autodetect_compiler_TEMPDIR=$(PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin mktemp -d "$_CS_DARWIN_USER_TEMP_DIR"/dkmlc.XXXXX)
     elif [ -n "${TMPDIR:-}" ]; then # macOS (see `man mktemp`)
         autodetect_compiler_TEMPDIR=$(printf "%s" "$TMPDIR" | sed 's#/$##') # remove trailing slash on macOS
-        autodetect_compiler_TEMPDIR=$(PATH=/usr/bin:/bin mktemp -d "$autodetect_compiler_TEMPDIR"/dkmlc.XXXXX)
+        autodetect_compiler_TEMPDIR=$(PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin mktemp -d "$autodetect_compiler_TEMPDIR"/dkmlc.XXXXX)
     elif [ -n "${TMP:-}" ]; then # MSYS2 (Windows), Linux
-        autodetect_compiler_TEMPDIR=$(PATH=/usr/bin:/bin mktemp -d "$TMP"/dkmlc.XXXXX)
+        autodetect_compiler_TEMPDIR=$(PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin mktemp -d "$TMP"/dkmlc.XXXXX)
     else
-        autodetect_compiler_TEMPDIR=$(PATH=/usr/bin:/bin mktemp -d /tmp/dkmlc.XXXXX)
+        autodetect_compiler_TEMPDIR=$(PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin mktemp -d /tmp/dkmlc.XXXXX)
     fi
     if [ -x /usr/bin/cygpath ]; then
         autodetect_compiler_TEMPDIR_WIN=$(/usr/bin/cygpath -aw "$autodetect_compiler_TEMPDIR")
@@ -2338,7 +2375,7 @@ autodetect_compiler_cmake() {
             fi
             case "$autodetect_compiler_add_parent_to_msvs_path_VAL" in
                 /*) # absolute Unix path
-                    autodetect_compiler_add_parent_to_msvs_path_VAL=$(PATH=/usr/bin:/bin dirname "$autodetect_compiler_add_parent_to_msvs_path_VAL")
+                    autodetect_compiler_add_parent_to_msvs_path_VAL=$(PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin dirname "$autodetect_compiler_add_parent_to_msvs_path_VAL")
                     autodetect_compiler_MSVS_PATH="$autodetect_compiler_add_parent_to_msvs_path_VAL${autodetect_compiler_MSVS_PATH:+:$autodetect_compiler_MSVS_PATH}"
             esac
         fi
@@ -2910,11 +2947,12 @@ autodetect_compiler_vsdev() {
         # Add CMAKE_GENERATOR_RECOMMENDED and CMAKE_GENERATOR_INSTANCE_RECOMMENDED
         case "$autodetect_compiler_vsdev_VSCMD_VER" in
             16.*) autodetect_compiler_vsdev_CMAKEGENERATOR="Visual Studio 16 2019" ;;
-            17.*) autodetect_compiler_vsdev_CMAKEGENERATOR="Visual Studio 17 2022";;
+            17.*) autodetect_compiler_vsdev_CMAKEGENERATOR="Visual Studio 17 2022" ;;
+            18.*) autodetect_compiler_vsdev_CMAKEGENERATOR="Visual Studio 18 2026" ;;
             *)
                 echo "FATAL: The Visual Studio installation \"$autodetect_compiler_vsdev_INSTALLDIR_BUILDHOST\" has a version" >&2
                 echo "       $autodetect_compiler_vsdev_VSCMD_VER not supported by DkML." >&2
-                echo "  Fix? Use Visual Studio 2019 or Visual Studio 2022." >&2
+                echo "  Fix? Use Visual Studio 2019 or 2022 or 2026." >&2
                 exit 107
         esac
         if [ "$autodetect_compiler_OUTPUTMODE" = SEXP ]; then
@@ -3396,7 +3434,7 @@ spawn_rsync() {
 }
 
 # Make a work directory. It is your responsibility to setup a trap as in:
-#   trap 'PATH=/usr/bin:/bin rm -rf "$WORK"' EXIT
+#   trap 'PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin rm -rf "$WORK"' EXIT
 # Inputs:
 #   env:DKML_TMP_PARENTDIR : Optional. If set then it will be used as the
 #   parent directory of the work directory.
@@ -3406,19 +3444,21 @@ create_workdir() {
     # Our use of mktemp needs to be portable; docs at:
     # * BSD: https://www.freebsd.org/cgi/man.cgi?query=mktemp&sektion=1
     # * GNU: https://www.gnu.org/software/autogen/mktemp.html
-    if [ -n "${_CS_DARWIN_USER_TEMP_DIR:-}" ]; then # macOS (see `man mktemp`)
+    if [ -n "${DK_RUNTIME_DIR:-}" ]; then # dk0, etc.
+        make_workdir_DEFAULT="$DK_RUNTIME_DIR/drc"
+    elif [ -n "${_CS_DARWIN_USER_TEMP_DIR:-}" ]; then # macOS (see `man mktemp`)
         make_workdir_DEFAULT="$_CS_DARWIN_USER_TEMP_DIR"
     elif [ -n "${TMPDIR:-}" ]; then # macOS (see `man mktemp`)
-        make_workdir_DEFAULT=$(printf "%s" "$TMPDIR" | PATH=/usr/bin:/bin sed 's#/$##') # remove trailing slash on macOS
+        make_workdir_DEFAULT=$(printf "%s" "$TMPDIR" | PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin sed 's#/$##') # remove trailing slash on macOS
     elif [ -n "${TMP:-}" ]; then # MSYS2 (Windows), Linux
         make_workdir_DEFAULT="$TMP"
     else
         make_workdir_DEFAULT="/tmp"
     fi
     DKML_TMP_PARENTDIR="${DKML_TMP_PARENTDIR:-$make_workdir_DEFAULT}"
-    [ ! -e "$DKML_TMP_PARENTDIR" ] && install -d "$DKML_TMP_PARENTDIR"
-    WORK=$(PATH=/usr/bin:/bin mktemp -d "$DKML_TMP_PARENTDIR"/dkmlw.XXXXX)
-    install -d "$WORK"
+    [ ! -e "$DKML_TMP_PARENTDIR" ] && PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin install -d "$DKML_TMP_PARENTDIR"
+    WORK=$(PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin mktemp -d "$DKML_TMP_PARENTDIR"/dkmlw.XXXXX)
+    PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin install -d "$WORK"
 }
 
 # When executing an `ocamlc -pp` preprocessor command like

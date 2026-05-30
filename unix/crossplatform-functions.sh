@@ -54,8 +54,10 @@ export SHARE_FUNCTIONS_RELPATH=share/dkml/functions
 #
 # These binaries are supported in this version:
 # - awk
+# - basename.   delegates to coreutils if available.
 # - cat.        delegates to coreutils if available.
 # - chmod.      delegates to coreutils if available.
+# - cmp.        delegates to coreutils if available.
 # - comm.       delegates to coreutils if available.
 # - cp.         delegates to coreutils if available.
 # - cut.        delegates to coreutils if available.
@@ -68,19 +70,22 @@ export SHARE_FUNCTIONS_RELPATH=share/dkml/functions
 # - mktemp.     delegates to coreutils if available.
 # - mv.         delegates to coreutils if available.
 # - paste.      delegates to coreutils if available.
+# - pwd.        delegates to coreutils if available.
 # - rm.         delegates to coreutils if available.
 # - sed
 # - sort.       delegates to coreutils if available.
 # - stat.       delegates to coreutils if available.
+# - touch.      delegates to coreutils if available.
 # - tr.         delegates to coreutils if available.
 # - uname.      delegates to coreutils if available.
+# - wc.         delegates to coreutils if available.
 # - wget
 hermetic_util() {
     if [ -z "${DK_UNIX_COREUTILS:-}" ]; then
         PATH=/usr/bin:/bin "$@"
     else
         case "$1" in
-            awk|cat|chmod|comm|cp|cut|date|dirname|env|install|mktemp|mv|paste|rm|sort|stat|tr|uname)
+            awk|basename|cat|chmod|cmp|comm|cp|cut|date|dirname|env|install|mktemp|mv|paste|pwd|rm|sort|stat|touch|tr|uname|wc)
                 "$DK_UNIX_COREUTILS" "$@"
                 ;;
             *)

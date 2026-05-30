@@ -77,7 +77,7 @@ WRAP_COMMANDS_CACHE_KEY=wrap-commands."$dkml_root_version"
 
 # Work directory $WORK
 create_workdir
-trap 'PATH=/usr/bin:/bin rm -rf "$WORK"' EXIT
+trap 'hermetic_util rm -rf "$WORK"' EXIT
 
 # Execute a command either for the dev environment or for the
 # reproducible sandbox corresponding to `$PLATFORM`

@@ -769,7 +769,7 @@ is_arg_darwin_based_platform() {
 #  env:DKMLDIR - The directory with .dkmlroot
 install_reproducible_common() {
     install_reproducible_common_BOOTSTRAPDIR=$DEPLOYDIR_UNIX/$SHARE_REPRODUCIBLE_BUILD_RELPATH/$BOOTSTRAPNAME
-    __hermetic_spawn install -d "$install_reproducible_common_BOOTSTRAPDIR"
+    __hermetic_spawn mkdir -p "$install_reproducible_common_BOOTSTRAPDIR"
     install_reproducible_file .dkmlroot
     install_reproducible_file vendor/drc/unix/crossplatform-functions.sh
     install_reproducible_file vendor/drc/unix/_common_tool.sh
@@ -790,7 +790,7 @@ install_reproducible_file() {
     shift
     _install_reproducible_file_RELDIR=$(dirname "$_install_reproducible_file_RELFILE")
     _install_reproducible_file_BOOTSTRAPDIR=$DEPLOYDIR_UNIX/$SHARE_REPRODUCIBLE_BUILD_RELPATH/$BOOTSTRAPNAME
-    __hermetic_spawn install -d "$_install_reproducible_file_BOOTSTRAPDIR"/"$_install_reproducible_file_RELDIR"/
+    __hermetic_spawn mkdir -p "$_install_reproducible_file_BOOTSTRAPDIR"/"$_install_reproducible_file_RELDIR"/
     # When we rerun a setup script from within
     # the reproducible target directory we may be installing on top of ourselves; that is, installing with
     # the source and destination files being the same file.
@@ -831,7 +831,7 @@ install_reproducible_generated_file() {
     shift
     install_reproducible_generated_file_RELDIR=$(dirname "$install_reproducible_generated_file_RELFILE")
     install_reproducible_generated_file_BOOTSTRAPDIR=$DEPLOYDIR_UNIX/$SHARE_REPRODUCIBLE_BUILD_RELPATH/$BOOTSTRAPNAME
-    __hermetic_spawn install -d "$install_reproducible_generated_file_BOOTSTRAPDIR"/"$install_reproducible_generated_file_RELDIR"/
+    __hermetic_spawn mkdir -p "$install_reproducible_generated_file_BOOTSTRAPDIR"/"$install_reproducible_generated_file_RELDIR"/
     __hermetic_spawn rm -f "$install_reproducible_generated_file_BOOTSTRAPDIR"/"$install_reproducible_generated_file_RELFILE" # ensure if exists it is a regular file or link but not a directory
     __hermetic_spawn install "$install_reproducible_generated_file_SRCFILE" "$install_reproducible_generated_file_BOOTSTRAPDIR"/"$install_reproducible_generated_file_RELFILE"
 }
@@ -858,7 +858,7 @@ install_reproducible_readme() {
 
     # Also place as a standalone README at the top of the reproducible tree
     install_reproducible_readme_BOOTSTRAPDIR=$DEPLOYDIR_UNIX/$SHARE_REPRODUCIBLE_BUILD_RELPATH/$BOOTSTRAPNAME
-    __hermetic_spawn install -d "$install_reproducible_readme_BOOTSTRAPDIR"
+    __hermetic_spawn mkdir -p "$install_reproducible_readme_BOOTSTRAPDIR"
     __hermetic_spawn sed "s,@@BOOTSTRAPDIR_UNIX@@,$SHARE_REPRODUCIBLE_BUILD_RELPATH/$BOOTSTRAPNAME/,g" "$DKMLDIR"/"$install_reproducible_readme_RELFILE" > "$install_reproducible_readme_BOOTSTRAPDIR"/README.md
 }
 
@@ -938,7 +938,7 @@ install_reproducible_system_packages() {
     install_reproducible_system_packages_SCRIPTDIR=$(dirname "$install_reproducible_system_packages_SCRIPTFILE")
     install_reproducible_system_packages_BOOTSTRAPRELDIR=$SHARE_REPRODUCIBLE_BUILD_RELPATH/$BOOTSTRAPNAME
     install_reproducible_system_packages_BOOTSTRAPDIR=$DEPLOYDIR_UNIX/$install_reproducible_system_packages_BOOTSTRAPRELDIR
-    __hermetic_spawn install -d "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTDIR"/
+    __hermetic_spawn mkdir -p "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTDIR"/
 
     if is_msys2_msys_build_machine && [ -x /git-bash.exe ]; then
         # Git Bash
@@ -1100,7 +1100,7 @@ install_reproducible_script_with_args() {
     install_reproducible_script_with_args_BOOTSTRAPDIR=$DEPLOYDIR_UNIX/$install_reproducible_script_with_args_BOOTSTRAPRELDIR
 
     install_reproducible_file "$install_reproducible_script_with_args_SCRIPTFILE"
-    __hermetic_spawn install -d "$install_reproducible_script_with_args_BOOTSTRAPDIR"/"$install_reproducible_script_with_args_RECREATEDIR"/
+    __hermetic_spawn mkdir -p "$install_reproducible_script_with_args_BOOTSTRAPDIR"/"$install_reproducible_script_with_args_RECREATEDIR"/
     {
         printf "#!/bin/sh\n"
         printf "set -euf\n"
@@ -1399,7 +1399,7 @@ create_system_launcher() {
     autodetect_system_binaries
 
     create_system_launcher_OUTPUTDIR=$(__hermetic_spawn dirname "$create_system_launcher_OUTPUTFILE")
-    [ ! -e "$create_system_launcher_OUTPUTDIR" ] && __hermetic_spawn install -d "$create_system_launcher_OUTPUTDIR" # Avoid 'Operation not permitted' if /tmp
+    [ ! -e "$create_system_launcher_OUTPUTDIR" ] && __hermetic_spawn mkdir -p "$create_system_launcher_OUTPUTDIR" # Avoid 'Operation not permitted' if /tmp
 
     if [ -x /usr/bin/cygpath ]; then
         create_system_launcher_SYSTEMPATHUNIX=$(/usr/bin/cygpath --path "$DKML_SYSTEM_PATH")
@@ -3510,9 +3510,9 @@ create_workdir() {
         make_workdir_DEFAULT="/tmp"
     fi
     DKML_TMP_PARENTDIR="${DKML_TMP_PARENTDIR:-$make_workdir_DEFAULT}"
-    [ ! -e "$DKML_TMP_PARENTDIR" ] && __hermetic_spawn install -d "$DKML_TMP_PARENTDIR"
+    [ ! -e "$DKML_TMP_PARENTDIR" ] && __hermetic_spawn mkdir -p "$DKML_TMP_PARENTDIR"
     WORK=$(__hermetic_spawn mktemp -d "$DKML_TMP_PARENTDIR"/dkmlw.XXXXX)
-    __hermetic_spawn install -d "$WORK"
+    __hermetic_spawn mkdir -p "$WORK"
 }
 
 # When executing an `ocamlc -pp` preprocessor command like

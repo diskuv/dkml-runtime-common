@@ -27,10 +27,32 @@
 #
 # Can be run within a container or outside of a container.
 #
+# Environment variables
+#
+# DK_RUNTIME_DIR: DK_RUNTIME_DIR/drc is used for create_workdir() if $DK_RUNTIME_DIR defined
+#
+# DK_UNIX_ESSENTIALS: Instead of restricting to PATH=/usr/bin:/bin, no PATH restriction is used.
+# The expectation is that the dk0 build system has already setup the PATH. The problem is
+# that BusyBox-w32 has no drive mounting like /c/ or /cygdrive/c in Cygwin/MSYS2
+# (confer https://frippery.org/busybox/paths.html) so no way to encode a PATH item that
+# contains a colon (like all native Windows paths).
 
 export SHARE_OCAML_OPAM_REPO_RELPATH=share/dkml/repro
 export SHARE_REPRODUCIBLE_BUILD_RELPATH=share/dkml/repro
 export SHARE_FUNCTIONS_RELPATH=share/dkml/functions
+
+# Binaries that may be hermetically spawned:
+# - dirname
+# - install
+# - mktemp
+# - sed
+__hermetic_spawn() {
+    if [ -z "${DK_UNIX_ESSENTIALS:-}" ]; then
+        PATH=/usr/bin:/bin "$@"
+    else
+        "$@"
+    fi
+}
 
 # Prefer dash if it is there because it is average 4x faster than bash and should
 # be much more secure. Otherwise /bin/sh which should always be a POSIX
@@ -264,7 +286,7 @@ __autodetect_system_path_push_git() {
     # Add Git at beginning of PATH
     autodetect_system_path_GITEXE=$(command -v git || true)
     if [ -n "$autodetect_system_path_GITEXE" ]; then
-        autodetect_system_path_GITDIR=$(PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin dirname "$autodetect_system_path_GITEXE")
+        autodetect_system_path_GITDIR=$(__hermetic_spawn dirname "$autodetect_system_path_GITEXE")
         case "$autodetect_system_path_GITDIR" in
             /usr/bin|/bin)
                 # __autodetect_system_path_push_usr_bin is responsible for
@@ -280,7 +302,7 @@ __autodetect_system_path_push_git() {
                 # but need the better directory:
                 #    ~/scoop/apps/git/current/cmd/git.exe
                 #    <no bash.exe!>
-                autodetect_system_path_GITGRANDDIR=$(PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin dirname "$autodetect_system_path_GITDIR")
+                autodetect_system_path_GITGRANDDIR=$(__hermetic_spawn dirname "$autodetect_system_path_GITDIR")
                 if [ -x "$autodetect_system_path_GITGRANDDIR/apps/git/current/cmd/git.exe" ]; then
                     autodetect_system_path_GITDIR="$autodetect_system_path_GITGRANDDIR/apps/git/current/cmd"
                 fi
@@ -297,12 +319,12 @@ __autodetect_system_path_push_usr_bin() {
     __autodetect_system_path_push_usr_bin_PATH=
 
     if is_cygwin_build_machine; then
-        __autodetect_system_path_push_usr_bin_PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin
+        __autodetect_system_path_push_usr_bin_PATH=/usr/bin:/bin
     elif is_msys2_msys_build_machine; then
         # /bin is a mount (essentially a symlink) to /usr/bin on MSYS2
         __autodetect_system_path_push_usr_bin_PATH=/usr/bin
     else
-        __autodetect_system_path_push_usr_bin_PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin
+        __autodetect_system_path_push_usr_bin_PATH=/usr/bin:/bin
     fi
 
     if [ -n "${DKML_SYSTEM_PATH:-}" ]; then
@@ -1347,7 +1369,7 @@ create_system_launcher() {
     # Set DKMLSYS_*
     autodetect_system_binaries
 
-    create_system_launcher_OUTPUTDIR=$(PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin dirname "$create_system_launcher_OUTPUTFILE")
+    create_system_launcher_OUTPUTDIR=$(__hermetic_spawn dirname "$create_system_launcher_OUTPUTFILE")
     [ ! -e "$create_system_launcher_OUTPUTDIR" ] && $DKMLSYS_INSTALL -d "$create_system_launcher_OUTPUTDIR" # Avoid 'Operation not permitted' if /tmp
 
     if [ -x /usr/bin/cygpath ]; then
@@ -1627,14 +1649,14 @@ autodetect_compiler() {
     if [ -n "${WORK:-}" ]; then
         autodetect_compiler_TEMPDIR=$WORK
     elif [ -n "${_CS_DARWIN_USER_TEMP_DIR:-}" ]; then # macOS (see `man mktemp`)
-        autodetect_compiler_TEMPDIR=$(PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin mktemp -d "$_CS_DARWIN_USER_TEMP_DIR"/dkmlc.XXXXX)
+        autodetect_compiler_TEMPDIR=$(__hermetic_spawn mktemp -d "$_CS_DARWIN_USER_TEMP_DIR"/dkmlc.XXXXX)
     elif [ -n "${TMPDIR:-}" ]; then # macOS (see `man mktemp`)
         autodetect_compiler_TEMPDIR=$(printf "%s" "$TMPDIR" | sed 's#/$##') # remove trailing slash on macOS
-        autodetect_compiler_TEMPDIR=$(PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin mktemp -d "$autodetect_compiler_TEMPDIR"/dkmlc.XXXXX)
+        autodetect_compiler_TEMPDIR=$(__hermetic_spawn mktemp -d "$autodetect_compiler_TEMPDIR"/dkmlc.XXXXX)
     elif [ -n "${TMP:-}" ]; then # MSYS2 (Windows), Linux
-        autodetect_compiler_TEMPDIR=$(PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin mktemp -d "$TMP"/dkmlc.XXXXX)
+        autodetect_compiler_TEMPDIR=$(__hermetic_spawn mktemp -d "$TMP"/dkmlc.XXXXX)
     else
-        autodetect_compiler_TEMPDIR=$(PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin mktemp -d /tmp/dkmlc.XXXXX)
+        autodetect_compiler_TEMPDIR=$(__hermetic_spawn mktemp -d /tmp/dkmlc.XXXXX)
     fi
     if [ -x /usr/bin/cygpath ]; then
         autodetect_compiler_TEMPDIR_WIN=$(/usr/bin/cygpath -aw "$autodetect_compiler_TEMPDIR")
@@ -2375,7 +2397,7 @@ autodetect_compiler_cmake() {
             fi
             case "$autodetect_compiler_add_parent_to_msvs_path_VAL" in
                 /*) # absolute Unix path
-                    autodetect_compiler_add_parent_to_msvs_path_VAL=$(PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin dirname "$autodetect_compiler_add_parent_to_msvs_path_VAL")
+                    autodetect_compiler_add_parent_to_msvs_path_VAL=$(__hermetic_spawn dirname "$autodetect_compiler_add_parent_to_msvs_path_VAL")
                     autodetect_compiler_MSVS_PATH="$autodetect_compiler_add_parent_to_msvs_path_VAL${autodetect_compiler_MSVS_PATH:+:$autodetect_compiler_MSVS_PATH}"
             esac
         fi
@@ -2434,7 +2456,7 @@ autodetect_compiler_system() {
                         autodetect_compiler_ASFLAGS=--32
                         ;;
                 esac
-            fi            
+            fi
         fi
         # LD, LDFLAGS + DIRECT_LD (specific to OCaml)
         case "$autodetect_compiler_PLATFORM_ARCH,$BUILDHOST_ARCH" in
@@ -2458,7 +2480,7 @@ autodetect_compiler_system() {
 
             # Unfortunately the mess of bad autoconf in the OCaml ecosystem means we
             # have had times where setting the LDFLAGS to `-melf_i386` was insufficient.
-            # 
+            #
             # Example 1:
             #   ld: Relocatable linking with relocations from format elf32-i386 (/tmp/dkmlw.hx2p3/camlDynlink_compilerlibs__15a96b.o) to format elf64-x86-64 (native/dynlink_compilerlibs.o) is not supported
             #   File "/builds/diskuv/distributions/1.0/dksdk-ffi-ocaml/build/o/ocamlffi/src-ocaml/otherlibs/dynlink/native/dynlink_compilerlibs.cmx", line 1:
@@ -2488,7 +2510,7 @@ autodetect_compiler_system() {
         esac
         if [ -z "${autodetect_compiler_LD:-}" ]; then
             autodetect_compiler_LD=$(command -v ld || true)
-        fi        
+        fi
     fi
 
     # Transform and write variables
@@ -2610,7 +2632,7 @@ autodetect_compiler_vsdev() {
             "$DKMLSYS_ENV" PATH="$autodetect_compiler_vsdev_SYSTEMPATHUNIX" __VSCMD_ARG_NO_LOGO=1 VSCMD_SKIP_SENDTELEMETRY=1 VSCMD_DEBUG="$autodetect_compiler_VSCMD_DEBUG" \
                 "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat \
                 -no_logo -vcvars_ver="$VSDEV_VCVARSVER" -winsdk="$VSDEV_WINSDKVER" "$@" >&2
-            if [ ! -e "$autodetect_compiler_TEMPDIR"/vcvars.txt ]; then 
+            if [ ! -e "$autodetect_compiler_TEMPDIR"/vcvars.txt ]; then
                 autodetect_compiler_vsdev_dump_script
                 echo >&2
                 echo "FAILED: $autodetect_compiler_vsdev_INSTALLDIR_BUILDHOST/Common7/Tools/VsDevCmd.bat -no_logo -vcvars_ver=$VSDEV_VCVARSVER -winsdk=$VSDEV_WINSDKVER $*" >&2
@@ -2625,7 +2647,7 @@ autodetect_compiler_vsdev() {
             "$DKMLSYS_ENV" PATH="$autodetect_compiler_vsdev_SYSTEMPATHUNIX" __VSCMD_ARG_NO_LOGO=1 VSCMD_SKIP_SENDTELEMETRY=1 VSCMD_DEBUG="$autodetect_compiler_VSCMD_DEBUG" \
                 "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat \
                 -no_logo "$@" >&2
-            if [ ! -e "$autodetect_compiler_TEMPDIR"/vcvars.txt ]; then 
+            if [ ! -e "$autodetect_compiler_TEMPDIR"/vcvars.txt ]; then
                 autodetect_compiler_vsdev_dump_script
                 echo >&2
                 echo "FAILED: $autodetect_compiler_vsdev_INSTALLDIR_BUILDHOST/Common7/Tools/VsDevCmd.bat -no_logo $*" >&2
@@ -3129,7 +3151,7 @@ sha256compute() {
         # CODESITE #1 (duplicates elsewhere).
         # On Debian shasum is a perl script, and perl needs locale settings or it will complain.
         # Confer: https://www.thomas-krenn.com/en/wiki/Perl_warning_Setting_locale_failed_in_Debian
-        # Confer: https://stackoverflow.com/a/52004330/21513816           
+        # Confer: https://stackoverflow.com/a/52004330/21513816
         #   shellcheck disable=SC2016
         LC_ALL=C /usr/bin/shasum -a 256 "$sha256compute_FILE" | "$DKMLSYS_AWK" '{print $1}'
     elif [ -x /usr/bin/sha256sum ]; then # Linux, MSYS2
@@ -3434,7 +3456,7 @@ spawn_rsync() {
 }
 
 # Make a work directory. It is your responsibility to setup a trap as in:
-#   trap 'PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin rm -rf "$WORK"' EXIT
+#   trap '__hermetic_spawn rm -rf "$WORK"' EXIT
 # Inputs:
 #   env:DKML_TMP_PARENTDIR : Optional. If set then it will be used as the
 #   parent directory of the work directory.
@@ -3449,16 +3471,16 @@ create_workdir() {
     elif [ -n "${_CS_DARWIN_USER_TEMP_DIR:-}" ]; then # macOS (see `man mktemp`)
         make_workdir_DEFAULT="$_CS_DARWIN_USER_TEMP_DIR"
     elif [ -n "${TMPDIR:-}" ]; then # macOS (see `man mktemp`)
-        make_workdir_DEFAULT=$(printf "%s" "$TMPDIR" | PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin sed 's#/$##') # remove trailing slash on macOS
+        make_workdir_DEFAULT=$(printf "%s" "$TMPDIR" | __hermetic_spawn sed 's#/$##') # remove trailing slash on macOS
     elif [ -n "${TMP:-}" ]; then # MSYS2 (Windows), Linux
         make_workdir_DEFAULT="$TMP"
     else
         make_workdir_DEFAULT="/tmp"
     fi
     DKML_TMP_PARENTDIR="${DKML_TMP_PARENTDIR:-$make_workdir_DEFAULT}"
-    [ ! -e "$DKML_TMP_PARENTDIR" ] && PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin install -d "$DKML_TMP_PARENTDIR"
-    WORK=$(PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin mktemp -d "$DKML_TMP_PARENTDIR"/dkmlw.XXXXX)
-    PATH=${DK_UNIX_ESSENTIALS:+${DK_UNIX_ESSENTIALS}/bin:}/usr/bin:/bin install -d "$WORK"
+    [ ! -e "$DKML_TMP_PARENTDIR" ] && __hermetic_spawn install -d "$DKML_TMP_PARENTDIR"
+    WORK=$(__hermetic_spawn mktemp -d "$DKML_TMP_PARENTDIR"/dkmlw.XXXXX)
+    __hermetic_spawn install -d "$WORK"
 }
 
 # When executing an `ocamlc -pp` preprocessor command like

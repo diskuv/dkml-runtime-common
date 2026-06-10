@@ -91,7 +91,6 @@ is_cygwin_build_machine() {
 # - env.        delegates to coreutils if available.
 # - find.       delegates to DK_UNIX_ESSENTIALS if available.
 # - grep.       delegates to DK_UNIX_ESSENTIALS if available.
-# - install.    delegates to coreutils if available.
 # - mktemp.     delegates to coreutils if available.
 # - mv.         delegates to coreutils if available.
 # - paste.      delegates to coreutils if available.
@@ -104,6 +103,11 @@ is_cygwin_build_machine() {
 # - tr.         delegates to coreutils if available.
 # - uname.      delegates to coreutils if available.
 # - wc.         delegates to coreutils if available.
+#
+# The "install" function is not provided on Windows by uutil's coreutils. Use "cp -p -t DESTDIR SOURCES..."
+# or "cp -p -T SRC DEST" instead.
+#
+# The "chmod" function is not provided on Windows by uutils' coreutils. Use hermetic_chmod_unix() instead.
 #
 # The following binaries should be found using autodetect_system_fetchers():
 # - curl.
@@ -845,7 +849,7 @@ install_reproducible_file() {
     if [ /dev/null -ef /dev/null ] 2>/dev/null; then
         # This script accepts the -ef operator
         if [ ! "$DKMLDIR"/"$_install_reproducible_file_RELFILE" -ef "$_install_reproducible_file_BOOTSTRAPDIR"/"$_install_reproducible_file_RELFILE" ]; then
-            hermetic_util install "$DKMLDIR"/"$_install_reproducible_file_RELFILE" "$_install_reproducible_file_BOOTSTRAPDIR"/"$_install_reproducible_file_RELDIR"/
+            hermetic_util cp -p -t "$_install_reproducible_file_BOOTSTRAPDIR"/"$_install_reproducible_file_RELDIR"/ "$DKMLDIR"/"$_install_reproducible_file_RELFILE"
         fi
     else
         # Sigh; portable scripts are not required to have a [ f1 -ef f2 ] operator. So we compare inodes (assuming `stat` supports `-c`)
@@ -856,7 +860,7 @@ install_reproducible_file() {
             install_reproducible_file_STAT2=
         fi
         if [ ! "$install_reproducible_file_STAT1" = "$install_reproducible_file_STAT2" ]; then
-            hermetic_util install "$DKMLDIR"/"$_install_reproducible_file_RELFILE" "$_install_reproducible_file_BOOTSTRAPDIR"/"$_install_reproducible_file_RELDIR"/
+            hermetic_util cp -p -t "$_install_reproducible_file_BOOTSTRAPDIR"/"$_install_reproducible_file_RELDIR"/ "$DKMLDIR"/"$_install_reproducible_file_RELFILE"
         fi
     fi
 }
@@ -880,7 +884,7 @@ install_reproducible_generated_file() {
     install_reproducible_generated_file_BOOTSTRAPDIR=$DEPLOYDIR_UNIX/$SHARE_REPRODUCIBLE_BUILD_RELPATH/$BOOTSTRAPNAME
     hermetic_util mkdir -p "$install_reproducible_generated_file_BOOTSTRAPDIR"/"$install_reproducible_generated_file_RELDIR"/
     hermetic_util rm -f "$install_reproducible_generated_file_BOOTSTRAPDIR"/"$install_reproducible_generated_file_RELFILE" # ensure if exists it is a regular file or link but not a directory
-    hermetic_util install "$install_reproducible_generated_file_SRCFILE" "$install_reproducible_generated_file_BOOTSTRAPDIR"/"$install_reproducible_generated_file_RELFILE"
+    hermetic_util cp -p -T "$install_reproducible_generated_file_SRCFILE" "$install_reproducible_generated_file_BOOTSTRAPDIR"/"$install_reproducible_generated_file_RELFILE"
 }
 
 # Install a README.md file that go into your reproducible build.
@@ -1018,7 +1022,7 @@ install_reproducible_system_packages() {
         if command -v brew >/dev/null; then
             # Brew exists and its installed packages can be used in the rest of the reproducible scripts.
             if [ -n "${DKML_REPRODUCIBLE_SYSTEM_BREWFILE:-}" ] && [ -e "${DKML_REPRODUCIBLE_SYSTEM_BREWFILE}" ]; then
-                hermetic_util install \
+                hermetic_util cp -p -T \
                     "$DKML_REPRODUCIBLE_SYSTEM_BREWFILE" \
                     "$install_reproducible_system_packages_BOOTSTRAPDIR/$install_reproducible_system_packages_PACKAGEFILE"
                 # For troubleshooting and a bit of security, place a comment saying the Brewfile was provided not queried

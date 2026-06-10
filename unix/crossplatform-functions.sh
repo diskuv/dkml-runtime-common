@@ -54,6 +54,27 @@ export SHARE_OCAML_OPAM_REPO_RELPATH=share/dkml/repro
 export SHARE_REPRODUCIBLE_BUILD_RELPATH=share/dkml/repro
 export SHARE_FUNCTIONS_RELPATH=share/dkml/functions
 
+# Is a MSYS2 environment with the MSYS or MINGW64 subsystem?
+# * MSYS2 can also do MinGW 32-bit and 64-bit subsystems. Used by DkML
+# * MINGW64 used by Git Bash (aka. GitHub Actions `shell: bash`)
+# https://www.msys2.org/docs/environments/
+is_msys2_msys_build_machine() {
+    if [ -e /usr/bin/msys-2.0.dll ] && {
+        [ "${MSYSTEM:-}" = "MSYS" ] || [ "${MSYSTEM:-}" = "MINGW64" ] || [ "${MSYSTEM:-}" = "UCRT64" ] || [ "${MSYSTEM:-}" = "CLANG64" ] || [ "${MSYSTEM:-}" = "MINGW32" ] || [ "${MSYSTEM:-}" = "CLANG32" ] || [ "${MSYSTEM:-}" = "CLANGARM64" ]
+    }; then
+        return 0
+    fi
+    return 1
+}
+
+# Is a Cygwin environment?
+is_cygwin_build_machine() {
+    if [ -e /usr/bin/cygwin1.dll ]; then
+        return 0
+    fi
+    return 1
+}
+
 # Spawn a binary that should only be run from /usr/bin or /bin on Unix
 # (or MSYS2 or Cygwin).
 #
@@ -61,7 +82,6 @@ export SHARE_FUNCTIONS_RELPATH=share/dkml/functions
 # - awk.        delegates to DK_UNIX_ESSENTIALS if available.
 # - basename.   delegates to coreutils if available.
 # - cat.        delegates to coreutils if available.
-# - chmod.      delegates to coreutils if available.
 # - cmp.        delegates to diffutils with fallback to DK_UNIX_ESSENTIALS if available.
 # - comm.       delegates to coreutils if available.
 # - cp.         delegates to coreutils if available.
@@ -90,7 +110,7 @@ export SHARE_FUNCTIONS_RELPATH=share/dkml/functions
 # - wget.
 hermetic_util() {
     case "$1" in
-        basename|cat|chmod|comm|cp|cut|date|dirname|env|install|mktemp|mv|paste|pwd|rm|sort|stat|touch|tr|uname|wc)
+        basename|cat|comm|cp|cut|date|dirname|env|install|mktemp|mv|paste|pwd|rm|sort|stat|touch|tr|uname|wc)
             if [ -n "${DK_UNIX_COREUTILS:-}" ]; then
                 "$DK_UNIX_COREUTILS" "$@"
             else
@@ -117,6 +137,21 @@ hermetic_util() {
         *)
             PATH=/usr/bin:/bin "$@" ;;
     esac
+}
+
+# On Unix this run chmod from DK_UNIX_COREUTILS if available, otherwise /usr/bin or /bin.
+# On Cygwin this run chmod from /usr/bin or /bin.
+# On Windows, including MSYS2 which mounts Windows drives with "noacl", this runs nothing.
+hermetic_chmod_unix() {
+    if [ -z "${COMSPEC:-}" ]; then # on Unix
+        if [ -n "${DK_UNIX_COREUTILS:-}" ]; then
+            "$DK_UNIX_COREUTILS" chmod "$@"
+        else
+            PATH=/usr/bin:/bin chmod "$@"
+        fi
+    elif is_cygwin_build_machine; then # on Cygwin
+        PATH=/usr/bin:/bin chmod "$@"
+    fi
 }
 
 # Prefer dash if it is there because it is average 4x faster than bash and should
@@ -713,26 +748,6 @@ is_unixy_windows_build_machine() {
     return 1
 }
 
-# Is a MSYS2 environment with the MSYS or MINGW64 subsystem?
-# * MSYS2 can also do MinGW 32-bit and 64-bit subsystems. Used by DkML
-# * MINGW64 used by Git Bash (aka. GitHub Actions `shell: bash`)
-# https://www.msys2.org/docs/environments/
-is_msys2_msys_build_machine() {
-    if [ -e /usr/bin/msys-2.0.dll ] && {
-        [ "${MSYSTEM:-}" = "MSYS" ] || [ "${MSYSTEM:-}" = "MINGW64" ] || [ "${MSYSTEM:-}" = "UCRT64" ] || [ "${MSYSTEM:-}" = "CLANG64" ] || [ "${MSYSTEM:-}" = "MINGW32" ] || [ "${MSYSTEM:-}" = "CLANG32" ] || [ "${MSYSTEM:-}" = "CLANGARM64" ]
-    }; then
-        return 0
-    fi
-    return 1
-}
-
-is_cygwin_build_machine() {
-    if [ -e /usr/bin/cygwin1.dll ]; then
-        return 0
-    fi
-    return 1
-}
-
 is_macos_build_machine() {
     if [ -x /usr/bin/uname ] && [ "$(/usr/bin/uname -s)" = Darwin ]; then
         return 0
@@ -1105,7 +1120,7 @@ install_reproducible_system_packages() {
         printf "%s\n" "TODO: unsupported install_reproducible_system_packages platform" >&2
         exit 1
     fi
-    hermetic_util chmod 755 "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"
+    hermetic_chmod_unix 755 "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"
 }
 
 # Install a script that can relaunch itself in a relocated position.
@@ -1149,7 +1164,7 @@ install_reproducible_script_with_args() {
         printf "\n"
         printf "fi\n"
     } > "$install_reproducible_script_with_args_BOOTSTRAPDIR"/"$install_reproducible_script_with_args_RECREATEFILE"
-    hermetic_util chmod 755 "$install_reproducible_script_with_args_BOOTSTRAPDIR"/"$install_reproducible_script_with_args_RECREATEFILE"
+    hermetic_chmod_unix 755 "$install_reproducible_script_with_args_BOOTSTRAPDIR"/"$install_reproducible_script_with_args_RECREATEFILE"
 }
 
 # Tries to find the host ABI.
@@ -1461,7 +1476,7 @@ create_system_launcher() {
     printf "#!%s\nset -euf\nexec %s%s PATH='%s' %s\n" "$DKML_POSIX_SHELL" "$DKMLSYS_ENV" \
         "$create_system_launcher_ENVARGS" \
         "$create_system_launcher_SYSTEMPATHUNIX" '"$@"' > "$create_system_launcher_OUTPUTFILE".tmp
-    hermetic_util chmod +x "$create_system_launcher_OUTPUTFILE".tmp
+    hermetic_chmod_unix +x "$create_system_launcher_OUTPUTFILE".tmp
     hermetic_util mv "$create_system_launcher_OUTPUTFILE".tmp "$create_system_launcher_OUTPUTFILE"
 }
 
@@ -1812,7 +1827,7 @@ autodetect_compiler() {
         hermetic_util mv "$autodetect_compiler_OUTPUTFILE".tmp "$autodetect_compiler_OUTPUTFILE"
     elif [ "$autodetect_compiler_OUTPUTMODE" = MSVS_DETECT ]; then
         true > "$autodetect_compiler_OUTPUTFILE"
-        hermetic_util chmod +x "$autodetect_compiler_OUTPUTFILE"
+        hermetic_chmod_unix +x "$autodetect_compiler_OUTPUTFILE"
     elif [ "$autodetect_compiler_OUTPUTMODE" = LAUNCHER ]; then
         create_system_launcher "$autodetect_compiler_OUTPUTFILE"
     fi
@@ -2309,7 +2324,7 @@ output_make ()
             printf 'esac\n'
         fi
     } > "$autodetect_compiler_OUTPUTFILE".tmp
-    hermetic_util chmod +x "$autodetect_compiler_OUTPUTFILE".tmp
+    hermetic_chmod_unix +x "$autodetect_compiler_OUTPUTFILE".tmp
     hermetic_util mv "$autodetect_compiler_OUTPUTFILE".tmp "$autodetect_compiler_OUTPUTFILE"
 }
 
@@ -2668,7 +2683,7 @@ autodetect_compiler_vsdev() {
         printf "set > %s%s%s%s\n" '"' "$autodetect_compiler_TEMPDIR_WIN" '\vcvars.txt' '"'
     } > "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat
     #   +x for Cygwin (not needed for MSYS2)
-    hermetic_util chmod +x "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat
+    hermetic_chmod_unix +x "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat
     autodetect_compiler_vsdev_dump_script() {
         printf "@+: %s/vsdevcmd-and-printenv.bat\n" "$autodetect_compiler_TEMPDIR" >&2
         hermetic_util sed 's/^/@+| /' "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat | hermetic_util awk '{print}' >&2

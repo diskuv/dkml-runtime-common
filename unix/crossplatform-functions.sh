@@ -37,31 +37,35 @@
 # a coreutils single binary and "coreutils mktemp ...", "coreutils dirname ...", etc. will
 # be used. On Windows with a BusyBox-w32 shell, this setting is required. The problem is
 # that BusyBox-w32 has no drive mounting like /c/ or /cygdrive/c in Cygwin/MSYS2
-# (confer https://frippery.org/busybox/paths.html) so no way to encode a PATH item that
-# contains a colon (like all native Windows paths).
+# (confer https://frippery.org/busybox/paths.html) so there is no way to reliably put
+# BusyBox-w32 binaries into the PATH since all native Windows paths contain colons (which
+# is a PATH separator in BusyBox-w32 sh.exe).
 #
-# DK_UNIX_ESSENTIALS: Optional. An environment containing the coreutils (bin/cat, etc.)
-# and awk and sed and a POSIX shell bin/sh.
+# DK_UNIX_DIFFUTILS: When hermetically spawning a diffutils binary, a search is done
+# in /usr/bin and then /bin. But uutils has a single binary for all diffutils and does not
+# need to be in /usr/bin or /bin (especially on Windows). Set this path to the location of
+# a diffutils single binary and "diffutils cmp ..." and "diffutils diff ..." will
+# be used.
+#
+# DK_UNIX_ESSENTIALS: Optional. An environment containing awk, curl, find, grep, sed,
+# wget and a POSIX shell bin/sh. Only one of curl and wget is needed.
 
 export SHARE_OCAML_OPAM_REPO_RELPATH=share/dkml/repro
 export SHARE_REPRODUCIBLE_BUILD_RELPATH=share/dkml/repro
 export SHARE_FUNCTIONS_RELPATH=share/dkml/functions
 
 # Spawn a binary that should only be run from /usr/bin or /bin on Unix
-# (or MSYS2 or Cygwin). On native Windows (ex. BusyBox-w32 sh.exe)
-# set the DK_UNIX_COREUTILS to a uutils' coreutils.exe single binary
-# that emulates the /bin binaries.
+# (or MSYS2 or Cygwin).
 #
 # These binaries are supported in this version:
 # - awk.        delegates to DK_UNIX_ESSENTIALS if available.
 # - basename.   delegates to coreutils if available.
 # - cat.        delegates to coreutils if available.
 # - chmod.      delegates to coreutils if available.
-# - cmp.        delegates to coreutils if available.
+# - cmp.        delegates to diffutils with fallback to DK_UNIX_ESSENTIALS if available.
 # - comm.       delegates to coreutils if available.
 # - cp.         delegates to coreutils if available.
 # - cut.        delegates to coreutils if available.
-# - curl.       delegates to DK_UNIX_ESSENTIALS if available.
 # - date.       delegates to coreutils if available.
 # - dirname.    delegates to coreutils if available.
 # - env.        delegates to coreutils if available.
@@ -80,26 +84,39 @@ export SHARE_FUNCTIONS_RELPATH=share/dkml/functions
 # - tr.         delegates to coreutils if available.
 # - uname.      delegates to coreutils if available.
 # - wc.         delegates to coreutils if available.
-# - wget
+#
+# The following binaries should be found using autodetect_system_fetchers():
+# - curl.
+# - wget.
 hermetic_util() {
-    if [ -z "${DK_UNIX_COREUTILS:-}" ]; then
-        PATH=/usr/bin:/bin "$@"
-    else
-        case "$1" in
-            basename|cat|chmod|cmp|comm|cp|cut|date|dirname|env|install|mktemp|mv|paste|pwd|rm|sort|stat|touch|tr|uname|wc)
+    case "$1" in
+        basename|cat|chmod|comm|cp|cut|date|dirname|env|install|mktemp|mv|paste|pwd|rm|sort|stat|touch|tr|uname|wc)
+            if [ -n "${DK_UNIX_COREUTILS:-}" ]; then
                 "$DK_UNIX_COREUTILS" "$@"
-                ;;
-            awk|curl|find|grep|sed|wget)
-                if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "$DK_UNIX_ESSENTIALS/bin/$1" ]; then
-                    shift
-                    "$DK_UNIX_ESSENTIALS/bin/$1" "$@"
-                else
-                    PATH=/usr/bin:/bin "$@"
-                fi ;;
-            *)
-                PATH=/usr/bin:/bin "$@" ;;
-        esac
-    fi
+            else
+                PATH=/usr/bin:/bin "$@"
+            fi
+            ;;
+        cmp)
+            if [ -n "${DK_UNIX_DIFFUTILS:-}" ]; then
+                "$DK_UNIX_DIFFUTILS" "$@"
+            elif [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "$DK_UNIX_ESSENTIALS/bin/$1" ]; then
+                shift
+                "$DK_UNIX_ESSENTIALS/bin/$1" "$@"
+            else
+                PATH=/usr/bin:/bin "$@"
+            fi
+            ;;
+        awk|find|grep|sed)
+            if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "$DK_UNIX_ESSENTIALS/bin/$1" ]; then
+                shift
+                "$DK_UNIX_ESSENTIALS/bin/$1" "$@"
+            else
+                PATH=/usr/bin:/bin "$@"
+            fi ;;
+        *)
+            PATH=/usr/bin:/bin "$@" ;;
+    esac
 }
 
 # Prefer dash if it is there because it is average 4x faster than bash and should

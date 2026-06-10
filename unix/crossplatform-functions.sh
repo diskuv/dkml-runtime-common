@@ -124,6 +124,10 @@ hermetic_util() {
         cmp)
             if [ -n "${DK_UNIX_DIFFUTILS:-}" ]; then
                 "$DK_UNIX_DIFFUTILS" "$@"
+            elif [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "$DK_UNIX_ESSENTIALS/bin/$1.exe" ]; then
+                # BusyBox-w32 requires `-x FILE.exe`. The `-x FILE` test will fail.
+                shift
+                "$DK_UNIX_ESSENTIALS/bin/$1.exe" "$@"
             elif [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "$DK_UNIX_ESSENTIALS/bin/$1" ]; then
                 shift
                 "$DK_UNIX_ESSENTIALS/bin/$1" "$@"
@@ -132,7 +136,11 @@ hermetic_util() {
             fi
             ;;
         awk|find|grep|sed)
-            if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "$DK_UNIX_ESSENTIALS/bin/$1" ]; then
+            if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "$DK_UNIX_ESSENTIALS/bin/$1.exe" ]; then
+                # BusyBox-w32 requires `-x FILE.exe`. The `-x FILE` test will fail.
+                shift
+                "$DK_UNIX_ESSENTIALS/bin/$1.exe" "$@"
+            elif [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "$DK_UNIX_ESSENTIALS/bin/$1" ]; then
                 shift
                 "$DK_UNIX_ESSENTIALS/bin/$1" "$@"
             else
@@ -1112,8 +1120,13 @@ install_reproducible_system_packages() {
     elif [ -n "${DEFAULT_DOCKCROSS_IMAGE:-}" ] || [ -e /dockcross ]; then
         true > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
         printf "#!/bin/sh\necho Run from inside the %s Docker container\n" "${DEFAULT_DOCKCROSS_IMAGE:-dockcross}" > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"
+    elif [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "$DK_UNIX_ESSENTIALS/bin/busybox.exe" ]; then
+        # The dk0 build system W64dev kit has Busybox-w32 for a POSIX shell on Windows.
+        # BusyBox-w32 requires `-x FILE.exe`. The `-x FILE` test will fail.
+        true > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
+        printf "#!/bin/sh\necho A dk0 build command is required to run the remaining scripts\n" > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"
     elif [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "$DK_UNIX_ESSENTIALS/bin/busybox" ]; then
-        # The dk0 build system W64dev kit has Busybox for a POSIX shell on Windows.
+        # For symmetry with BusyBox-w32 but no known users of this path (Unix, non-system busybox)
         true > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_PACKAGEFILE"
         printf "#!/bin/sh\necho A dk0 build command is required to run the remaining scripts\n" > "$install_reproducible_system_packages_BOOTSTRAPDIR"/"$install_reproducible_system_packages_SCRIPTFILE"
     elif [ -x /bin/busybox ]; then

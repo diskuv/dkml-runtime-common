@@ -163,6 +163,8 @@ hermetic_chmod_unix() {
         fi
     elif is_cygwin_build_machine; then # on Cygwin
         PATH=/usr/bin:/bin chmod "$@"
+    else # on non-Cygwin Windows, chmod is intentionally a no-op
+        return 0
     fi
 }
 

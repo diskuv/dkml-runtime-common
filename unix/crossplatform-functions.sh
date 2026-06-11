@@ -2670,7 +2670,7 @@ autodetect_compiler_vsdev() {
         autodetect_compiler_vsdev_INSTALLDIR_BUILDHOST="$autodetect_compiler_vsdev_INSTALLDIR_UNIX"
     fi
 
-    # The vsdevcmd.bat is at /c/DiskuvOCaml/BuildTools/Common7/Tools/VsDevCmd.bat.
+    # FIRST, the vsdevcmd.bat is at <installdir>/Common7/Tools/VsDevCmd.bat.
     if [ -e "$autodetect_compiler_vsdev_INSTALLDIR_UNIX"/Common7/Tools/VsDevCmd.bat ]; then
         autodetect_compiler_vsdev_VSDEVCMD="$autodetect_compiler_vsdev_INSTALLDIR_UNIX/Common7/Tools/VsDevCmd.bat"
     else
@@ -2678,9 +2678,83 @@ autodetect_compiler_vsdev() {
         exit 107
     fi
 
-    # FIRST, create a file that calls vsdevcmd.bat and then adds a `set` dump.
+    # SECOND, create options for vsdevcmd.bat and OCAML_HOST_TRIPLET and the assembler we'll validate works.
+    # https://docs.microsoft.com/en-us/cpp/build/building-on-the-command-line?view=msvc-160#vcvarsall-syntax
+    # https://learn.microsoft.com/en-us/visualstudio/ide/reference/command-prompt-powershell?view=visualstudio
+    autodetect_compiler_VSDEVCMD_OPTIONS="-no_logo"
+    if [ -n "${VSDEV_VCVARSVER:-}" ] && [ -n "${VSDEV_WINSDKVER}" ]; then
+        autodetect_compiler_VSDEVCMD_OPTIONS="$autodetect_compiler_VSDEVCMD_OPTIONS -vcvars_ver=$VSDEV_VCVARSVER -winsdk=$VSDEV_WINSDKVER"
+    fi
+    # Notice that for MSVC the build machine is always x86 or x86_64, never ARM or ARM64.
+    # And:
+    #  * we follow the first triple of Rust naming of aarch64-pc-windows-msvc for the OCAML_HOST_TRIPLET on ARM64
+    #  * we use armv7-pc-windows on ARM32 because OCaml's ./configure needs the ARM model (v6, v7, etc.).
+    #    WinCE 7.0 and 8.0 support ARMv7, but don't mandate it; WinCE 8.0 extended support from MS is in
+    #    2023 so ARMv7 should be fine.
+    if [ "$BUILDHOST_ARCH" = windows_x86 ]; then
+        # The build host machine is 32-bit ...
+        if [ "$autodetect_compiler_PLATFORM_ARCH" = dev ] || [ "$autodetect_compiler_PLATFORM_ARCH" = windows_x86 ]; then
+            # The target machine is 32-bit
+            autodetect_compiler_VSDEVCMD_OPTIONS="$autodetect_compiler_VSDEVCMD_OPTIONS -arch=x86"
+            OCAML_HOST_TRIPLET=i686-pc-windows
+            autodetect_compiler_vsdev_VALIDATE_ASM="ml.exe"
+        elif [ "$autodetect_compiler_PLATFORM_ARCH" = windows_x86_64 ]; then
+            # The target machine is 64-bit
+            autodetect_compiler_VSDEVCMD_OPTIONS="$autodetect_compiler_VSDEVCMD_OPTIONS -host_arch=x86 -arch=x64"
+            OCAML_HOST_TRIPLET=x86_64-pc-windows
+            autodetect_compiler_vsdev_VALIDATE_ASM="ml64.exe"
+        elif [ "$autodetect_compiler_PLATFORM_ARCH" = windows_arm32 ]; then
+            # The target machine is 32-bit
+            autodetect_compiler_VSDEVCMD_OPTIONS="$autodetect_compiler_VSDEVCMD_OPTIONS -host_arch=x86 -arch=arm"
+            OCAML_HOST_TRIPLET=aarch64-pc-windows
+            autodetect_compiler_vsdev_VALIDATE_ASM="armasm64.exe"
+        elif [ "$autodetect_compiler_PLATFORM_ARCH" = windows_arm64 ]; then
+            # The target machine is 64-bit
+            autodetect_compiler_VSDEVCMD_OPTIONS="$autodetect_compiler_VSDEVCMD_OPTIONS -host_arch=x86 -arch=arm64"
+            OCAML_HOST_TRIPLET=armv7-pc-windows
+            autodetect_compiler_vsdev_VALIDATE_ASM="armasm.exe"
+        else
+            printf "%s\n" "FATAL: check_state autodetect_compiler BUILDHOST_ARCH=$BUILDHOST_ARCH autodetect_compiler_PLATFORM_ARCH=$autodetect_compiler_PLATFORM_ARCH" >&2
+            exit 107
+        fi
+    elif [ "$BUILDHOST_ARCH" = windows_x86_64 ]; then
+        # The build host machine is 64-bit ...
+        if [ "$autodetect_compiler_PLATFORM_ARCH" = dev ] || [ "$autodetect_compiler_PLATFORM_ARCH" = windows_x86_64 ]; then
+            # The target machine is 64-bit
+            autodetect_compiler_VSDEVCMD_OPTIONS="$autodetect_compiler_VSDEVCMD_OPTIONS -arch=x64"
+            OCAML_HOST_TRIPLET=x86_64-pc-windows
+            autodetect_compiler_vsdev_VALIDATE_ASM="ml64.exe"
+        elif [ "$autodetect_compiler_PLATFORM_ARCH" = windows_x86 ]; then
+            # The target machine is 32-bit            
+            if [ "${DKML_PREFER_CROSS_OVER_NATIVE:-OFF}" = ON ]; then
+                autodetect_compiler_VSDEVCMD_OPTIONS="$autodetect_compiler_VSDEVCMD_OPTIONS -host_arch=x64 -arch=x86"
+            else
+                autodetect_compiler_VSDEVCMD_OPTIONS="$autodetect_compiler_VSDEVCMD_OPTIONS -arch=x86"
+            fi
+            OCAML_HOST_TRIPLET=i686-pc-windows
+            autodetect_compiler_vsdev_VALIDATE_ASM="ml.exe"
+        elif [ "$autodetect_compiler_PLATFORM_ARCH" = windows_arm64 ]; then
+            # The target machine is 64-bit
+            autodetect_compiler_VSDEVCMD_OPTIONS="$autodetect_compiler_VSDEVCMD_OPTIONS -host_arch=x64 -arch=arm64"
+            OCAML_HOST_TRIPLET=aarch64-pc-windows
+            autodetect_compiler_vsdev_VALIDATE_ASM="armasm64.exe"
+        elif [ "$autodetect_compiler_PLATFORM_ARCH" = windows_arm32 ]; then
+            # The target machine is 32-bit
+            autodetect_compiler_VSDEVCMD_OPTIONS="$autodetect_compiler_VSDEVCMD_OPTIONS -host_arch=x64 -arch=arm"
+            OCAML_HOST_TRIPLET=armv7-pc-windows
+            autodetect_compiler_vsdev_VALIDATE_ASM="armasm.exe"
+        else
+            printf "%s\n" "FATAL: check_state autodetect_compiler BUILDHOST_ARCH=$BUILDHOST_ARCH autodetect_compiler_PLATFORM_ARCH=$autodetect_compiler_PLATFORM_ARCH" >&2
+            exit 107
+        fi
+    else
+        printf "%s\n" "FATAL: check_state autodetect_compiler BUILDHOST_ARCH=$BUILDHOST_ARCH autodetect_compiler_PLATFORM_ARCH=$autodetect_compiler_PLATFORM_ARCH" >&2
+        exit 107
+    fi
+
+    # THIRD, create a file that calls vsdevcmd.bat with the options and then adds a `set` dump.
     # Example:
-    #     @call "C:\DiskuvOCaml\BuildTools\Common7\Tools\VsDevCmd.bat" %*
+    #     @call "C:\DiskuvOCaml\BuildTools\Common7\Tools\VsDevCmd.bat" -nologo
     #     set > "C:\the-WORK-directory\vcvars.txt"
     # to the bottom of it so we can inspect the environment variables.
     # (Less hacky version of https://help.appveyor.com/discussions/questions/18777-how-to-use-vcvars64bat-from-powershell)
@@ -2689,9 +2763,21 @@ autodetect_compiler_vsdev() {
     else
         autodetect_compiler_VSDEVCMDFILE_WIN="$autodetect_compiler_vsdev_VSDEVCMD"
     fi
+    if   [ "${DKML_BUILD_TRACE:-OFF}" = ON ] && [ "${DKML_BUILD_TRACE_LEVEL:-0}" -ge 4 ]; then
+        autodetect_compiler_VSCMD_DEBUG=3
+    elif [ "${DKML_BUILD_TRACE:-OFF}" = ON ] && [ "${DKML_BUILD_TRACE_LEVEL:-0}" -ge 3 ]; then
+        autodetect_compiler_VSCMD_DEBUG=2
+    elif [ "${DKML_BUILD_TRACE:-OFF}" = ON ] && [ "${DKML_BUILD_TRACE_LEVEL:-0}" -ge 2 ]; then
+        autodetect_compiler_VSCMD_DEBUG=1
+    else
+        autodetect_compiler_VSCMD_DEBUG=
+    fi
     {
         printf "@SET TEMP=%s\n" "$autodetect_compiler_TEMPDIR_DOS"
-        printf "@CALL %s%s%s %s\n" '"' "$autodetect_compiler_VSDEVCMDFILE_WIN" '"' '%*'
+        printf "@SET __VSCMD_ARG_NO_LOGO=1\n"
+        printf "@SET VSCMD_SKIP_SENDTELEMETRY=1\n"
+        printf "@SET VSCMD_DEBUG=%s\n" "$autodetect_compiler_VSCMD_DEBUG"
+        printf "@CALL %s%s%s %s\n" '"' "$autodetect_compiler_VSDEVCMDFILE_WIN" '"' "$autodetect_compiler_VSDEVCMD_OPTIONS"
         printf "%s\n" '@SET _VSERR=%ERRORLEVEL%'
         printf "%s\n" 'if %_VSERR% neq 0 ('
         printf "%s\n" 'echo.'
@@ -2711,141 +2797,27 @@ autodetect_compiler_vsdev() {
         autodetect_compiler_vsdev_dump_script
     fi
 
-    # SECOND, construct a function that will call Microsoft's vsdevcmd.bat script.
+    # THIRD, run the script that will call Microsoft's vsdevcmd.bat script.
     # We will use DKML_SYSTEM_PATH for reproducibility.
-    if   [ "${DKML_BUILD_TRACE:-OFF}" = ON ] && [ "${DKML_BUILD_TRACE_LEVEL:-0}" -ge 4 ]; then
-        autodetect_compiler_VSCMD_DEBUG=3
-    elif [ "${DKML_BUILD_TRACE:-OFF}" = ON ] && [ "${DKML_BUILD_TRACE_LEVEL:-0}" -ge 3 ]; then
-        autodetect_compiler_VSCMD_DEBUG=2
-    elif [ "${DKML_BUILD_TRACE:-OFF}" = ON ] && [ "${DKML_BUILD_TRACE_LEVEL:-0}" -ge 2 ]; then
-        autodetect_compiler_VSCMD_DEBUG=1
-    else
-        autodetect_compiler_VSCMD_DEBUG=
-    fi
     if [ -x /usr/bin/cygpath ]; then
         autodetect_compiler_vsdev_SYSTEMPATHUNIX=$(/usr/bin/cygpath --path "$DKML_SYSTEM_PATH")
     else
         autodetect_compiler_vsdev_SYSTEMPATHUNIX="$DKML_SYSTEM_PATH"
     fi
-    # https://docs.microsoft.com/en-us/cpp/build/building-on-the-command-line?view=msvc-160#vcvarsall-syntax
-    # Notice that for MSVC the build machine is always x86 or x86_64, never ARM or ARM64.
-    # And:
-    #  * we follow the first triple of Rust naming of aarch64-pc-windows-msvc for the OCAML_HOST_TRIPLET on ARM64
-    #  * we use armv7-pc-windows on ARM32 because OCaml's ./configure needs the ARM model (v6, v7, etc.).
-    #    WinCE 7.0 and 8.0 support ARMv7, but don't mandate it; WinCE 8.0 extended support from MS is in
-    #    2023 so ARMv7 should be fine.
-    if [ -n "${VSDEV_VCVARSVER:-}" ] && [ -n "${VSDEV_WINSDKVER}" ]; then
-        autodetect_compiler_vsdev_dump_vars_helper() {
-            hermetic_util rm -f "$autodetect_compiler_TEMPDIR"/vcvars.txt
-            hermetic_util env PATH="$autodetect_compiler_vsdev_SYSTEMPATHUNIX" __VSCMD_ARG_NO_LOGO=1 VSCMD_SKIP_SENDTELEMETRY=1 VSCMD_DEBUG="$autodetect_compiler_VSCMD_DEBUG" \
-                "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat \
-                -no_logo -vcvars_ver="$VSDEV_VCVARSVER" -winsdk="$VSDEV_WINSDKVER" "$@" >&2
-            if [ ! -e "$autodetect_compiler_TEMPDIR"/vcvars.txt ]; then
-                autodetect_compiler_vsdev_dump_script
-                echo >&2
-                echo "FAILED: $autodetect_compiler_vsdev_INSTALLDIR_BUILDHOST/Common7/Tools/VsDevCmd.bat -no_logo -vcvars_ver=$VSDEV_VCVARSVER -winsdk=$VSDEV_WINSDKVER $*" >&2
-                set | hermetic_util grep "^DKML_COMPILE_" >&2
-                echo "DKMLPARENTHOME_BUILDHOST=${DKMLPARENTHOME_BUILDHOST:-}" >&2
-                exit 107
-            fi
-        }
-    else
-        autodetect_compiler_vsdev_dump_vars_helper() {
-            hermetic_util rm -f "$autodetect_compiler_TEMPDIR"/vcvars.txt
-            hermetic_util env PATH="$autodetect_compiler_vsdev_SYSTEMPATHUNIX" __VSCMD_ARG_NO_LOGO=1 VSCMD_SKIP_SENDTELEMETRY=1 VSCMD_DEBUG="$autodetect_compiler_VSCMD_DEBUG" \
-                "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat \
-                -no_logo "$@" >&2
-            if [ ! -e "$autodetect_compiler_TEMPDIR"/vcvars.txt ]; then
-                autodetect_compiler_vsdev_dump_script
-                echo >&2
-                echo "FAILED: $autodetect_compiler_vsdev_INSTALLDIR_BUILDHOST/Common7/Tools/VsDevCmd.bat -no_logo $*" >&2
-                set | hermetic_util grep "^DKML_COMPILE_" >&2
-                echo "DKMLPARENTHOME_BUILDHOST=${DKMLPARENTHOME_BUILDHOST:-}" >&2
-                exit 107
-            fi
-        }
-    fi
-    if [ "$BUILDHOST_ARCH" = windows_x86 ]; then
-        # The build host machine is 32-bit ...
-        if [ "$autodetect_compiler_PLATFORM_ARCH" = dev ] || [ "$autodetect_compiler_PLATFORM_ARCH" = windows_x86 ]; then
-            # The target machine is 32-bit
-            autodetect_compiler_vsdev_dump_vars() {
-                autodetect_compiler_vsdev_dump_vars_helper -arch=x86
-            }
-            OCAML_HOST_TRIPLET=i686-pc-windows
-            autodetect_compiler_vsdev_VALIDATE_ASM="ml.exe"
-        elif [ "$autodetect_compiler_PLATFORM_ARCH" = windows_x86_64 ]; then
-            # The target machine is 64-bit
-            autodetect_compiler_vsdev_dump_vars() {
-                autodetect_compiler_vsdev_dump_vars_helper -host_arch=x86 -arch=x64
-            }
-            OCAML_HOST_TRIPLET=x86_64-pc-windows
-            autodetect_compiler_vsdev_VALIDATE_ASM="ml64.exe"
-        elif [ "$autodetect_compiler_PLATFORM_ARCH" = windows_arm32 ]; then
-            # The target machine is 32-bit
-            autodetect_compiler_vsdev_dump_vars() {
-                autodetect_compiler_vsdev_dump_vars_helper -host_arch=x86 -arch=arm
-            }
-            OCAML_HOST_TRIPLET=aarch64-pc-windows
-            autodetect_compiler_vsdev_VALIDATE_ASM="armasm64.exe"
-        elif [ "$autodetect_compiler_PLATFORM_ARCH" = windows_arm64 ]; then
-            # The target machine is 64-bit
-            autodetect_compiler_vsdev_dump_vars() {
-                autodetect_compiler_vsdev_dump_vars_helper -host_arch=x86 -arch=arm64
-            }
-            OCAML_HOST_TRIPLET=armv7-pc-windows
-            autodetect_compiler_vsdev_VALIDATE_ASM="armasm.exe"
-        else
-            printf "%s\n" "FATAL: check_state autodetect_compiler BUILDHOST_ARCH=$BUILDHOST_ARCH autodetect_compiler_PLATFORM_ARCH=$autodetect_compiler_PLATFORM_ARCH" >&2
-            exit 107
-        fi
-    elif [ "$BUILDHOST_ARCH" = windows_x86_64 ]; then
-        # The build host machine is 64-bit ...
-        if [ "$autodetect_compiler_PLATFORM_ARCH" = dev ] || [ "$autodetect_compiler_PLATFORM_ARCH" = windows_x86_64 ]; then
-            # The target machine is 64-bit
-            autodetect_compiler_vsdev_dump_vars() {
-                autodetect_compiler_vsdev_dump_vars_helper -arch=x64
-            }
-            OCAML_HOST_TRIPLET=x86_64-pc-windows
-            autodetect_compiler_vsdev_VALIDATE_ASM="ml64.exe"
-        elif [ "$autodetect_compiler_PLATFORM_ARCH" = windows_x86 ]; then
-            # The target machine is 32-bit
-            autodetect_compiler_vsdev_dump_vars() {
-                if [ "${DKML_PREFER_CROSS_OVER_NATIVE:-OFF}" = ON ]; then
-                    autodetect_compiler_vsdev_dump_vars_helper -host_arch=x64 -arch=x86
-                else
-                    autodetect_compiler_vsdev_dump_vars_helper -arch=x86
-                fi
-            }
-            OCAML_HOST_TRIPLET=i686-pc-windows
-            autodetect_compiler_vsdev_VALIDATE_ASM="ml.exe"
-        elif [ "$autodetect_compiler_PLATFORM_ARCH" = windows_arm64 ]; then
-            # The target machine is 64-bit
-            autodetect_compiler_vsdev_dump_vars() {
-                autodetect_compiler_vsdev_dump_vars_helper -host_arch=x64 -arch=arm64
-            }
-            OCAML_HOST_TRIPLET=aarch64-pc-windows
-            autodetect_compiler_vsdev_VALIDATE_ASM="armasm64.exe"
-        elif [ "$autodetect_compiler_PLATFORM_ARCH" = windows_arm32 ]; then
-            # The target machine is 32-bit
-            autodetect_compiler_vsdev_dump_vars() {
-                autodetect_compiler_vsdev_dump_vars_helper -host_arch=x64 -arch=arm
-            }
-            OCAML_HOST_TRIPLET=armv7-pc-windows
-            autodetect_compiler_vsdev_VALIDATE_ASM="armasm.exe"
-        else
-            printf "%s\n" "FATAL: check_state autodetect_compiler BUILDHOST_ARCH=$BUILDHOST_ARCH autodetect_compiler_PLATFORM_ARCH=$autodetect_compiler_PLATFORM_ARCH" >&2
-            exit 107
-        fi
-    else
-        printf "%s\n" "FATAL: check_state autodetect_compiler BUILDHOST_ARCH=$BUILDHOST_ARCH autodetect_compiler_PLATFORM_ARCH=$autodetect_compiler_PLATFORM_ARCH" >&2
+    hermetic_util rm -f "$autodetect_compiler_TEMPDIR"/vcvars.txt
+    hermetic_util env PATH="$autodetect_compiler_vsdev_SYSTEMPATHUNIX" \
+        "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat \
+        "$@" >&2
+    if [ ! -e "$autodetect_compiler_TEMPDIR"/vcvars.txt ]; then
+        autodetect_compiler_vsdev_dump_script
+        echo >&2
+        echo "FAILED: $autodetect_compiler_vsdev_INSTALLDIR_BUILDHOST/Common7/Tools/VsDevCmd.bat $autodetect_compiler_VSDEVCMD_OPTIONS $*" >&2
+        set | hermetic_util grep "^DKML_COMPILE_" >&2
+        echo "DKMLPARENTHOME_BUILDHOST=${DKMLPARENTHOME_BUILDHOST:-}" >&2
         exit 107
     fi
 
-    # THIRD, we run the batch file
-    autodetect_compiler_vsdev_dump_vars
-
-    # FOURTH, capture everything we will need in the launcher environment except:
+    # FIFTH, capture everything we will need in the launcher environment except:
     # - PATH (we need to cygpath this, and we need to replace any existing PATH)
     # - MSVS_PREFERENCE (we will add our own)
     # - INCLUDE (we actually add this, but we also add our own vcpkg include path)
@@ -2907,7 +2879,7 @@ autodetect_compiler_vsdev() {
     $1 == "LIB" {name=$1; value=$0; sub(/^[^=]*=/,"",value); print name "=" value}
     ' "$autodetect_compiler_TEMPDIR"/vcvars.txt > "$autodetect_compiler_TEMPDIR"/mostvars.eval.sh
 
-    # FIFTH, set autodetect_compiler_COMPILER_PATH to the provided PATH
+    # SIXTH, set autodetect_compiler_COMPILER_PATH to the provided PATH
     # shellcheck disable=SC2016
     hermetic_util awk '
     BEGIN{FS="="}
@@ -2949,7 +2921,7 @@ autodetect_compiler_vsdev() {
     # and set the assembler to the full path
     autodetect_compiler_vsdev_MSVS_ML=$(PATH="$autodetect_compiler_COMPILER_PATH_UNIX" command -v "$autodetect_compiler_vsdev_VALIDATE_ASM")
 
-    # SIXTH, set autodetect_compiler_COMPILER_UNIQ_PATH so that it is only the _unique_ entries
+    # SEVENTH, set autodetect_compiler_COMPILER_UNIQ_PATH so that it is only the _unique_ entries
     # (the set {autodetect_compiler_COMPILER_UNIQ_PATH} - {DKML_SYSTEM_PATH}) are used. But maintain the order
     # that Microsoft places each path entry.
     printf "%s\n" "$autodetect_compiler_COMPILER_PATH_UNIX" | hermetic_util awk 'BEGIN{RS=":"} {print}' > "$autodetect_compiler_TEMPDIR"/vcvars_entries_unix.txt
@@ -2973,7 +2945,7 @@ autodetect_compiler_vsdev() {
     done < "$autodetect_compiler_TEMPDIR"/vcvars_entries_unix.txt
     autodetect_compiler_COMPILER_WINDOWS_UNIQ_PATH=$(printf "%s\n" "$autodetect_compiler_COMPILER_UNIX_UNIQ_PATH" | /usr/bin/cygpath -w --path -f -)
 
-    # SEVENTH, Standardized compiler environment variables
+    # EIGHTH, Standardized compiler environment variables
     #   When compiling opam, the opam ./configure cannot handle spaces. Probably
     #   many other programs as well. So use [cygpath -d]
     autodetect_compiler_CC=$(PATH="$autodetect_compiler_COMPILER_PATH_UNIX" command -v cl.exe)

@@ -2849,11 +2849,18 @@ autodetect_compiler_vsdev() {
     else
         autodetect_compiler_VSCMD_DEBUG=
     fi
+    #   We will use DKML_SYSTEM_PATH_WIN32 for reproducibility.
+    if [ -x /usr/bin/cygpath ]; then
+        autodetect_compiler_vsdev_SYSTEMPATH_WIN32=$(/usr/bin/cygpath --path "$DKML_SYSTEM_PATH_WIN32")
+    else
+        autodetect_compiler_vsdev_SYSTEMPATH_WIN32="$DKML_SYSTEM_PATH_WIN32"
+    fi
     {
         printf "@SET TEMP=%s\n" "$autodetect_compiler_TEMPDIR_DOS"
         printf "@SET __VSCMD_ARG_NO_LOGO=1\n"
         printf "@SET VSCMD_SKIP_SENDTELEMETRY=1\n"
         printf "@SET VSCMD_DEBUG=%s\n" "$autodetect_compiler_VSCMD_DEBUG"
+        printf "@SET PATH=%s\n" "$autodetect_compiler_vsdev_SYSTEMPATH_WIN32"
         printf "@CALL %s%s%s %s\n" '"' "$autodetect_compiler_VSDEVCMDFILE_WIN" '"' "$autodetect_compiler_VSDEVCMD_OPTIONS"
         printf "%s\n" '@SET _VSERR=%ERRORLEVEL%'
         printf "%s\n" 'if %_VSERR% neq 0 ('
@@ -2875,16 +2882,8 @@ autodetect_compiler_vsdev() {
     fi
 
     # THIRD, run the script that will call Microsoft's vsdevcmd.bat script.
-    # We will use DKML_SYSTEM_PATH_UNIX for reproducibility.
-    if [ -x /usr/bin/cygpath ]; then
-        autodetect_compiler_vsdev_SYSTEMPATHUNIX=$(/usr/bin/cygpath --path "$DKML_SYSTEM_PATH_UNIX")
-    else
-        autodetect_compiler_vsdev_SYSTEMPATHUNIX="$DKML_SYSTEM_PATH_UNIX"
-    fi
     hermetic_util rm -f "$autodetect_compiler_TEMPDIR"/vcvars.txt
-    hermetic_util env PATH="$autodetect_compiler_vsdev_SYSTEMPATHUNIX" \
-        "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat \
-        "$@" >&2
+    "$autodetect_compiler_TEMPDIR"/vsdevcmd-and-printenv.bat "$@" >&2
     if [ ! -e "$autodetect_compiler_TEMPDIR"/vcvars.txt ]; then
         autodetect_compiler_vsdev_dump_script
         echo >&2

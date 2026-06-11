@@ -424,11 +424,15 @@ __autodetect_system_path_push_git() {
                 if [ -x "$autodetect_system_path_GITGRANDDIR/apps/git/current/cmd/git.exe" ]; then
                     autodetect_system_path_GITDIR="$autodetect_system_path_GITGRANDDIR/apps/git/current/cmd"
                 fi
-                # Add to DKML_SYSTEM_PATH
-                if [ -n "${DKML_SYSTEM_PATH:-}" ]; then
+                # Add to DKML_SYSTEM_PATH_UNIX/_WIN32 and deprecated DKML_SYSTEM_PATH
+                if [ -n "${DKML_SYSTEM_PATH_UNIX:-}" ]; then
                     DKML_SYSTEM_PATH="$autodetect_system_path_GITDIR:$DKML_SYSTEM_PATH"
+                    DKML_SYSTEM_PATH_UNIX="$autodetect_system_path_GITDIR:$DKML_SYSTEM_PATH_UNIX"
+                    DKML_SYSTEM_PATH_WIN32="$autodetect_system_path_GITDIR;$DKML_SYSTEM_PATH_WIN32"
                 else
                     DKML_SYSTEM_PATH="$autodetect_system_path_GITDIR"
+                    DKML_SYSTEM_PATH_UNIX="$autodetect_system_path_GITDIR"
+                    DKML_SYSTEM_PATH_WIN32="$autodetect_system_path_GITDIR"
                 fi
         esac
     fi
@@ -441,14 +445,32 @@ __autodetect_system_path_push_usr_bin() {
     elif is_msys2_msys_build_machine; then
         # /bin is a mount (essentially a symlink) to /usr/bin on MSYS2
         __autodetect_system_path_push_usr_bin_PATH=/usr/bin
+    elif [ -n "${COMSPEC:-}" ]; then
+        # Windows but not MSYS2 or Cygwin. Ex. BusyBox-w32
+        # No /usr/bin or /bin available.
+        true
     else
+        # Unix
         __autodetect_system_path_push_usr_bin_PATH=/usr/bin:/bin
     fi
 
-    if [ -n "${DKML_SYSTEM_PATH:-}" ]; then
-        DKML_SYSTEM_PATH="$__autodetect_system_path_push_usr_bin_PATH:$DKML_SYSTEM_PATH"
+    # Add to DKML_SYSTEM_PATH_UNIX/_WIN32 and deprecated DKML_SYSTEM_PATH
+    if [ -n "${DKML_SYSTEM_PATH_UNIX:-}" ]; then
+        if [ -n "$__autodetect_system_path_push_usr_bin_PATH" ]; then
+            DKML_SYSTEM_PATH="$__autodetect_system_path_push_usr_bin_PATH:$DKML_SYSTEM_PATH"
+            DKML_SYSTEM_PATH_UNIX="$__autodetect_system_path_push_usr_bin_PATH:$DKML_SYSTEM_PATH_UNIX"
+            DKML_SYSTEM_PATH_WIN32="$__autodetect_system_path_push_usr_bin_PATH;$DKML_SYSTEM_PATH_WIN32"
+        fi
     else
-        DKML_SYSTEM_PATH="$__autodetect_system_path_push_usr_bin_PATH"
+        if [ -n "$__autodetect_system_path_push_usr_bin_PATH" ]; then
+            DKML_SYSTEM_PATH="$__autodetect_system_path_push_usr_bin_PATH"
+            DKML_SYSTEM_PATH_UNIX="$__autodetect_system_path_push_usr_bin_PATH"
+            DKML_SYSTEM_PATH_WIN32="$__autodetect_system_path_push_usr_bin_PATH"
+        else
+            DKML_SYSTEM_PATH=
+            DKML_SYSTEM_PATH_UNIX=
+            DKML_SYSTEM_PATH_WIN32=
+        fi
     fi
 }
 
@@ -457,17 +479,60 @@ __autodetect_system_path_helper() {
     shift
 
     export DKML_SYSTEM_PATH
+    export DKML_SYSTEM_PATH_UNIX
+    export DKML_SYSTEM_PATH_WIN32
+
+    autodetect_system_path_SYSDIR_UNIX=
+    autodetect_system_path_SYSDIR_WIN32=
+    autodetect_system_path_WINDIR_UNIX=
+    autodetect_system_path_WINDIR_WIN32=
+    autodetect_system_path_PROGRAMFILES_UNIX=
+    autodetect_system_path_PROGRAMFILES_WIN32=
     if [ -x /usr/bin/cygpath ]; then
-        autodetect_system_path_SYSDIR=$(/usr/bin/cygpath --sysdir)
-        autodetect_system_path_WINDIR=$(/usr/bin/cygpath --windir)
+        autodetect_system_path_SYSDIR_UNIX=$(/usr/bin/cygpath --sysdir --unix)
+        autodetect_system_path_SYSDIR_WIN32=$(/usr/bin/cygpath --sysdir --windows)
+        autodetect_system_path_WINDIR_UNIX=$(/usr/bin/cygpath --windir --unix)
+        autodetect_system_path_WINDIR_WIN32=$(/usr/bin/cygpath --windir --windows)
         # folder 38 = C:\Program Files typically
-        autodetect_system_path_PROGRAMFILES=$(/usr/bin/cygpath --folder 38)
+        autodetect_system_path_PROGRAMFILES_UNIX=$(/usr/bin/cygpath --folder 38 --unix)
+        autodetect_system_path_PROGRAMFILES_WIN32=$(/usr/bin/cygpath --folder 38 --windows)
+    elif [ -n "${COMSPEC:-}" ]; then
+        # Windows but not MSYS2 or Cygwin. Ex. BusyBox-w32.
+        # We can use $env:SystemRoot and $env:ProgramFiles to derive what we need.
+        # However, Windows env is case-insensitive but case-preserving, and Unix is case-sensitive.
+        # So we have to normalize the Windows env vars values.
+        autodetect_system_path_SYSTEMROOT_UNIX=
+        autodetect_system_path_SYSTEMROOT_WIN32=
+        if [ -n "${SystemRoot:-}" ]; then
+            autodetect_system_path_SYSTEMROOT_UNIX="${SystemRoot//\\//}" # backslashes replaced by forward slashes
+            autodetect_system_path_SYSTEMROOT_WIN32="${SystemRoot//\//\\}" # forward slashes replaced by backslashes
+        elif [ -n "${SYSTEMROOT:-}" ]; then
+            autodetect_system_path_SYSTEMROOT_UNIX="${SYSTEMROOT//\\//}" # backslashes replaced by forward slashes
+            autodetect_system_path_SYSTEMROOT_WIN32="${SYSTEMROOT//\//\\}" # forward slashes replaced by backslashes
+        fi
+        if [ -n "${ProgramFiles:-}" ]; then
+            autodetect_system_path_PROGRAMFILES_UNIX="${ProgramFiles//\\//}" # backslashes replaced by forward slashes
+            autodetect_system_path_PROGRAMFILES_WIN32="${ProgramFiles//\//\\}" # forward slashes replaced by backslashes
+        elif [ -n "${PROGRAMFILES:-}" ]; then
+            autodetect_system_path_PROGRAMFILES_UNIX="${PROGRAMFILES//\\//}" # backslashes replaced by forward slashes
+            autodetect_system_path_PROGRAMFILES_WIN32="${PROGRAMFILES//\//\\}" # forward slashes replaced by backslashes
+        fi
+        if [ -n "${autodetect_system_path_SYSTEMROOT_UNIX:-}" ]; then
+            autodetect_system_path_SYSDIR_UNIX="$autodetect_system_path_SYSTEMROOT_UNIX/System32"
+            autodetect_system_path_SYSDIR_WIN32="$autodetect_system_path_SYSTEMROOT_WIN32\\System32"
+            autodetect_system_path_WINDIR_UNIX="$autodetect_system_path_SYSTEMROOT_UNIX"
+            autodetect_system_path_WINDIR_WIN32="$autodetect_system_path_SYSTEMROOT_WIN32"
+        fi
     fi
 
-    if is_cygwin_build_machine || is_msys2_msys_build_machine; then
-        DKML_SYSTEM_PATH=$autodetect_system_path_PROGRAMFILES/PowerShell/7:$autodetect_system_path_SYSDIR:$autodetect_system_path_WINDIR:$autodetect_system_path_SYSDIR/Wbem:$autodetect_system_path_SYSDIR/WindowsPowerShell/v1.0:$autodetect_system_path_SYSDIR/OpenSSH
+    if [ -n "$autodetect_system_path_PROGRAMFILES_UNIX" ] && [ -n "$autodetect_system_path_SYSDIR_UNIX" ] && [ -n "$autodetect_system_path_WINDIR_UNIX" ]; then
+        DKML_SYSTEM_PATH_UNIX=$autodetect_system_path_PROGRAMFILES_UNIX/PowerShell/7:$autodetect_system_path_SYSDIR_UNIX:$autodetect_system_path_WINDIR_UNIX:$autodetect_system_path_SYSDIR_UNIX/Wbem:$autodetect_system_path_SYSDIR_UNIX/WindowsPowerShell/v1.0:$autodetect_system_path_SYSDIR_UNIX/OpenSSH
+        DKML_SYSTEM_PATH_WIN32="$autodetect_system_path_PROGRAMFILES_WIN32\\PowerShell\\7;$autodetect_system_path_SYSDIR_WIN32;$autodetect_system_path_WINDIR_WIN32;$autodetect_system_path_SYSDIR_WIN32\\Wbem;$autodetect_system_path_SYSDIR_WIN32\\WindowsPowerShell\\v1.0;$autodetect_system_path_SYSDIR_WIN32\\OpenSSH"
+        DKML_SYSTEM_PATH=$DKML_SYSTEM_PATH_UNIX
     else
         DKML_SYSTEM_PATH=
+        DKML_SYSTEM_PATH_UNIX=
+        DKML_SYSTEM_PATH_WIN32=
         # RHEL has a Developer Toolset which should be in the path for things
         # like the latest GCC compilers. It is used, for example, by dockcross Linux.
         # Confer: https://access.redhat.com/documentation/en-us/red_hat_developer_toolset/12/html/12.0_release_notes/index
@@ -475,6 +540,8 @@ __autodetect_system_path_helper() {
             for __autodetect_system_path_helper_I in 19 18 17 16 15 14 13 12 11 10 9 8 7 6 4; do
                 if [ -d /opt/rh/devtoolset-$__autodetect_system_path_helper_I/root/usr/bin ]; then
                     DKML_SYSTEM_PATH=/opt/rh/devtoolset-$__autodetect_system_path_helper_I/root/usr/bin
+                    DKML_SYSTEM_PATH_UNIX=/opt/rh/devtoolset-$__autodetect_system_path_helper_I/root/usr/bin
+                    DKML_SYSTEM_PATH_WIN32=/opt/rh/devtoolset-$__autodetect_system_path_helper_I/root/usr/bin
                     break
                 fi
             done
@@ -497,6 +564,8 @@ __autodetect_system_path_helper() {
     # Add $DKMLHOME_UNIX/bin at beginning of PATH
     if [ -n "${DKMLHOME_UNIX:-}" ] && [ -d "$DKMLHOME_UNIX/bin" ]; then
         DKML_SYSTEM_PATH="$DKMLHOME_UNIX/bin:$DKML_SYSTEM_PATH"
+        DKML_SYSTEM_PATH_UNIX="$DKMLHOME_UNIX/bin:$DKML_SYSTEM_PATH_UNIX"
+        DKML_SYSTEM_PATH_WIN32="$DKMLHOME_UNIX\\bin;$DKML_SYSTEM_PATH_WIN32"
     fi
 }
 
@@ -510,8 +579,12 @@ __autodetect_system_path_helper() {
 # included.
 #
 # Output:
-#   env:DKML_SYSTEM_PATH - A PATH containing only system directories like /usr/bin.
-#      The path will be in Unix format (so a path on Windows MSYS2 could be /c/Windows/System32)
+#   env:DKML_SYSTEM_PATH - Deprecated. Unix format PATH. Use DKML_SYSTEM_PATH_UNIX or DKML_SYSTEM_PATH_WIN32 instead.
+#   env:DKML_SYSTEM_PATH_UNIX - A PATH containing only system directories like /usr/bin, in Unix `:`
+#      path separator format. The paths will be in Unix format (so a path on Windows MSYS2 could be
+#      /c/Windows/System32 and in Windows Cygwin could be /cygdrive/c/Windows/System32)
+#   env:DKML_SYSTEM_PATH_WIN32 - A PATH containing only system directories like C:\Windows\System32, in Windows
+#      `;` path separator format.
 autodetect_system_path() {
     __autodetect_system_path_helper USR_BIN_FIRST
 }
@@ -535,8 +608,12 @@ autodetect_system_path() {
 # included.
 #
 # Output:
-#   env:DKML_SYSTEM_PATH - A PATH containing only system directories like /usr/bin.
-#      The path will be in Unix format (so a path on Windows MSYS2 could be /c/Windows/System32)
+#   env:DKML_SYSTEM_PATH - Deprecated. Unix format PATH. Use DKML_SYSTEM_PATH_UNIX or DKML_SYSTEM_PATH_WIN32 instead.
+#   env:DKML_SYSTEM_PATH_UNIX - A PATH containing only system directories like /usr/bin, in Unix `:`
+#      path separator format. The paths will be in Unix format (so a path on Windows MSYS2 could be
+#      /c/Windows/System32 and in Windows Cygwin could be /cygdrive/c/Windows/System32)
+#   env:DKML_SYSTEM_PATH_WIN32 - A PATH containing only system directories like C:\Windows\System32, in Windows
+#      `;` path separator format.
 autodetect_system_path_with_git_before_usr_bin() {
     __autodetect_system_path_helper GIT_FIRST
 }
@@ -1467,7 +1544,7 @@ create_system_launcher() {
     create_system_launcher_OUTPUTFILE="$1"
     shift
 
-    # Set DKML_SYSTEM_PATH
+    # Set DKML_SYSTEM_PATH_UNIX
     autodetect_system_path
     # Set DKML_POSIX_SHELL if not already set
     autodetect_posix_shell
@@ -1478,9 +1555,9 @@ create_system_launcher() {
     [ ! -e "$create_system_launcher_OUTPUTDIR" ] && hermetic_util mkdir -p "$create_system_launcher_OUTPUTDIR" # Avoid 'Operation not permitted' if /tmp
 
     if [ -x /usr/bin/cygpath ]; then
-        create_system_launcher_SYSTEMPATHUNIX=$(/usr/bin/cygpath --path "$DKML_SYSTEM_PATH")
+        create_system_launcher_SYSTEMPATHUNIX=$(/usr/bin/cygpath --path "$DKML_SYSTEM_PATH_UNIX")
     else
-        create_system_launcher_SYSTEMPATHUNIX="$DKML_SYSTEM_PATH"
+        create_system_launcher_SYSTEMPATHUNIX="$DKML_SYSTEM_PATH_UNIX"
     fi
 
     # With MSYS2
@@ -2798,11 +2875,11 @@ autodetect_compiler_vsdev() {
     fi
 
     # THIRD, run the script that will call Microsoft's vsdevcmd.bat script.
-    # We will use DKML_SYSTEM_PATH for reproducibility.
+    # We will use DKML_SYSTEM_PATH_UNIX for reproducibility.
     if [ -x /usr/bin/cygpath ]; then
-        autodetect_compiler_vsdev_SYSTEMPATHUNIX=$(/usr/bin/cygpath --path "$DKML_SYSTEM_PATH")
+        autodetect_compiler_vsdev_SYSTEMPATHUNIX=$(/usr/bin/cygpath --path "$DKML_SYSTEM_PATH_UNIX")
     else
-        autodetect_compiler_vsdev_SYSTEMPATHUNIX="$DKML_SYSTEM_PATH"
+        autodetect_compiler_vsdev_SYSTEMPATHUNIX="$DKML_SYSTEM_PATH_UNIX"
     fi
     hermetic_util rm -f "$autodetect_compiler_TEMPDIR"/vcvars.txt
     hermetic_util env PATH="$autodetect_compiler_vsdev_SYSTEMPATHUNIX" \
@@ -2922,11 +2999,11 @@ autodetect_compiler_vsdev() {
     autodetect_compiler_vsdev_MSVS_ML=$(PATH="$autodetect_compiler_COMPILER_PATH_UNIX" command -v "$autodetect_compiler_vsdev_VALIDATE_ASM")
 
     # SEVENTH, set autodetect_compiler_COMPILER_UNIQ_PATH so that it is only the _unique_ entries
-    # (the set {autodetect_compiler_COMPILER_UNIQ_PATH} - {DKML_SYSTEM_PATH}) are used. But maintain the order
+    # (the set {autodetect_compiler_COMPILER_UNIQ_PATH} - {DKML_SYSTEM_PATH_UNIX}) are used. But maintain the order
     # that Microsoft places each path entry.
     printf "%s\n" "$autodetect_compiler_COMPILER_PATH_UNIX" | hermetic_util awk 'BEGIN{RS=":"} {print}' > "$autodetect_compiler_TEMPDIR"/vcvars_entries_unix.txt
     hermetic_util sort -u "$autodetect_compiler_TEMPDIR"/vcvars_entries_unix.txt > "$autodetect_compiler_TEMPDIR"/vcvars_entries_unix.sortuniq.txt
-    printf "%s\n" "$DKML_SYSTEM_PATH" | hermetic_util awk 'BEGIN{RS=":"} {print}' | hermetic_util sort -u > "$autodetect_compiler_TEMPDIR"/path.sortuniq.txt
+    printf "%s\n" "$DKML_SYSTEM_PATH_UNIX" | hermetic_util awk 'BEGIN{RS=":"} {print}' | hermetic_util sort -u > "$autodetect_compiler_TEMPDIR"/path.sortuniq.txt
     hermetic_util comm \
         -23 \
         "$autodetect_compiler_TEMPDIR"/vcvars_entries_unix.sortuniq.txt \
@@ -3414,10 +3491,10 @@ buildhost_pathize() {
 
 # [system_tar ARGS] runs the `tar` command with a system PATH and logging
 system_tar() {
-    # Set DKML_SYSTEM_PATH
+    # Set DKML_SYSTEM_PATH_UNIX
     autodetect_system_path
 
-    PATH=$DKML_SYSTEM_PATH log_trace tar "$@"
+    PATH=$DKML_SYSTEM_PATH_UNIX log_trace tar "$@"
 }
 
 # [autodetect_system_powershell]
@@ -3425,18 +3502,18 @@ system_tar() {
 # - env:DKML_SYSTEM_POWERSHELL
 # Return Code: 0 if found, 1 if not found
 autodetect_system_powershell() {
-    # Set DKML_SYSTEM_PATH (which will include legacy `powershell.exe` if it exists)
+    # Set DKML_SYSTEM_PATH_UNIX (which will include legacy `powershell.exe` if it exists)
     autodetect_system_path
 
     # Try pwsh first
-    system_powershell_PWSH=$(PATH="$DKML_SYSTEM_PATH" command -v pwsh || true)
+    system_powershell_PWSH=$(PATH="$DKML_SYSTEM_PATH_UNIX" command -v pwsh || true)
     if [ -n "$system_powershell_PWSH" ]; then
         DKML_SYSTEM_POWERSHELL="$system_powershell_PWSH"
         return 0
     fi
 
     # Then powershell first
-    system_powershell_POWERSHELL=$(PATH="$DKML_SYSTEM_PATH" command -v powershell || true)
+    system_powershell_POWERSHELL=$(PATH="$DKML_SYSTEM_PATH_UNIX" command -v powershell || true)
     if [ -n "$system_powershell_POWERSHELL" ]; then
         # shellcheck disable=SC2034
         DKML_SYSTEM_POWERSHELL="$system_powershell_POWERSHELL"
@@ -3448,16 +3525,16 @@ autodetect_system_powershell() {
 
 # [system_powershell ARGS] runs `pwsh` or `powershell` with a system PATH and logging
 system_powershell() {
-    # Set DKML_SYSTEM_PATH (which will include legacy `powershell.exe` if it exists)
+    # Set DKML_SYSTEM_PATH_UNIX (which will include legacy `powershell.exe` if it exists)
     autodetect_system_path
 
     # Set DKML_SYSTEM_POWERSHELL
     if ! autodetect_system_powershell; then
-        printf "FATAL: No pwsh or powershell available in the system PATH %s\n" "$DKML_SYSTEM_PATH" >&2
+        printf "FATAL: No pwsh or powershell available in the system PATH %s\n" "$DKML_SYSTEM_PATH_UNIX" >&2
         exit 107
     fi
 
-    PATH="$DKML_SYSTEM_PATH" log_trace "$DKML_SYSTEM_POWERSHELL" "$@"
+    PATH="$DKML_SYSTEM_PATH_UNIX" log_trace "$DKML_SYSTEM_POWERSHELL" "$@"
 }
 
 # Always prefers bin/ocaml (install-time native code binaries)

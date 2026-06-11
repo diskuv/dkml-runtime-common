@@ -2966,11 +2966,13 @@ autodetect_compiler_vsdev() {
         # shellcheck disable=SC2086
         /usr/bin/cygpath --path -f - < "$autodetect_compiler_TEMPDIR/winpath.txt" > "$autodetect_compiler_TEMPDIR"/unixpath.txt
     else
+        # ex. BusyBox-w32 sh.exe which uses semicolon as PATH separator.
+        # So unixpath.txt will intentionally get semicolon separators.
         hermetic_util cp "$autodetect_compiler_TEMPDIR/winpath.txt" "$autodetect_compiler_TEMPDIR"/unixpath.txt
     fi
     # shellcheck disable=SC2034
     autodetect_compiler_COMPILER_PATH_UNIX=$(hermetic_util cat "$autodetect_compiler_TEMPDIR"/unixpath.txt)
-    autodetect_compiler_COMPILER_PATH_WIN=$(hermetic_util cat "$autodetect_compiler_TEMPDIR"/winpath.txt)
+    autodetect_compiler_COMPILER_PATH_WIN32=$(hermetic_util cat "$autodetect_compiler_TEMPDIR"/winpath.txt)
 
     # VERIFY: make sure VsDevCmd.bat gave us the correct target assembler (which have unique names per target architecture)
     # shellcheck disable=SC2016
@@ -2998,28 +3000,35 @@ autodetect_compiler_vsdev() {
     autodetect_compiler_vsdev_MSVS_ML=$(PATH="$autodetect_compiler_COMPILER_PATH_UNIX" command -v "$autodetect_compiler_vsdev_VALIDATE_ASM")
 
     # SEVENTH, set autodetect_compiler_COMPILER_UNIQ_PATH so that it is only the _unique_ entries
-    # (the set {autodetect_compiler_COMPILER_UNIQ_PATH} - {DKML_SYSTEM_PATH_UNIX}) are used. But maintain the order
+    # (the set {autodetect_compiler_COMPILER_UNIQ_PATH} - {DKML_SYSTEM_PATH_WIN32}) are used. But maintain the order
     # that Microsoft places each path entry.
-    printf "%s\n" "$autodetect_compiler_COMPILER_PATH_UNIX" | hermetic_util awk 'BEGIN{RS=":"} {print}' > "$autodetect_compiler_TEMPDIR"/vcvars_entries_unix.txt
-    hermetic_util sort -u "$autodetect_compiler_TEMPDIR"/vcvars_entries_unix.txt > "$autodetect_compiler_TEMPDIR"/vcvars_entries_unix.sortuniq.txt
-    printf "%s\n" "$DKML_SYSTEM_PATH_UNIX" | hermetic_util awk 'BEGIN{RS=":"} {print}' | hermetic_util sort -u > "$autodetect_compiler_TEMPDIR"/path.sortuniq.txt
-    hermetic_util comm \
+    printf "%s" "$autodetect_compiler_COMPILER_PATH_WIN32" | hermetic_util awk 'BEGIN{RS=";"} {print}' > "$autodetect_compiler_TEMPDIR"/vcvars_entries_win32.txt
+    hermetic_util sort -u "$autodetect_compiler_TEMPDIR"/vcvars_entries_win32.txt > "$autodetect_compiler_TEMPDIR"/vcvars_entries_win32.sortuniq.txt
+    printf "%s" "$DKML_SYSTEM_PATH_WIN32" | hermetic_util awk 'BEGIN{RS=";"} {print}' | hermetic_util sort -u > "$autodetect_compiler_TEMPDIR"/path.sortuniq.txt
+    #   Unfortunately uutils' comm has bug https://github.com/uutils/coreutils/issues/12253
+    #   where it incorrectly complains the files are not sorted. Mitigate that
+    #   with: 2> /dev/null || true
+    autodetect_compiler_vsdev_comm_with_mitigation() {
+        hermetic_util comm "$@" 2> /dev/null || true
+    }
+    autodetect_compiler_vsdev_comm_with_mitigation \
         -23 \
-        "$autodetect_compiler_TEMPDIR"/vcvars_entries_unix.sortuniq.txt \
+        "$autodetect_compiler_TEMPDIR"/vcvars_entries_win32.sortuniq.txt \
         "$autodetect_compiler_TEMPDIR"/path.sortuniq.txt \
         > "$autodetect_compiler_TEMPDIR"/vcvars_uniq.txt
-    autodetect_compiler_COMPILER_UNIX_UNIQ_PATH=
+    autodetect_compiler_COMPILER_WIN32_UNIQ_PATH=
     while IFS='' read -r autodetect_compiler_line; do
         # if and only if the $autodetect_compiler_line matches one of the lines in vcvars_uniq.txt
-        if ! printf "%s\n" "$autodetect_compiler_line" | hermetic_util comm -12 - "$autodetect_compiler_TEMPDIR"/vcvars_uniq.txt | hermetic_util awk 'NF>0{exit 1}'; then
-            if [ -z "$autodetect_compiler_COMPILER_UNIX_UNIQ_PATH" ]; then
-                autodetect_compiler_COMPILER_UNIX_UNIQ_PATH="$autodetect_compiler_line"
+        if ! printf "%s\n" "$autodetect_compiler_line" | autodetect_compiler_vsdev_comm_with_mitigation -12 - "$autodetect_compiler_TEMPDIR"/vcvars_uniq.txt | hermetic_util awk 'NF>0{exit 1}'; then
+            if [ -z "$autodetect_compiler_COMPILER_WIN32_UNIQ_PATH" ]; then
+                autodetect_compiler_COMPILER_WIN32_UNIQ_PATH="$autodetect_compiler_line"
             else
-                autodetect_compiler_COMPILER_UNIX_UNIQ_PATH="$autodetect_compiler_COMPILER_UNIX_UNIQ_PATH:$autodetect_compiler_line"
+                autodetect_compiler_COMPILER_WIN32_UNIQ_PATH="$autodetect_compiler_COMPILER_WIN32_UNIQ_PATH;$autodetect_compiler_line"
             fi
         fi
-    done < "$autodetect_compiler_TEMPDIR"/vcvars_entries_unix.txt
-    autodetect_compiler_COMPILER_WINDOWS_UNIQ_PATH=$(printf "%s\n" "$autodetect_compiler_COMPILER_UNIX_UNIQ_PATH" | /usr/bin/cygpath -w --path -f -)
+    done < "$autodetect_compiler_TEMPDIR"/vcvars_entries_win32.txt
+    #   Replace backslashes with forward slashes (nit: the path separator is still Windows though)
+    autodetect_compiler_COMPILER_UNIX_UNIQ_PATH=${autodetect_compiler_COMPILER_WIN32_UNIQ_PATH//\\//}
 
     # EIGHTH, Standardized compiler environment variables
     #   When compiling opam, the opam ./configure cannot handle spaces. Probably
@@ -3144,13 +3153,19 @@ autodetect_compiler_vsdev() {
 
         # Add PATH
         if [ "$autodetect_compiler_OUTPUTMODE" = SEXP ]; then
-            autodetect_compiler_COMPILER_PATH_WIN_QUOTED=$(printf "%s" "$autodetect_compiler_COMPILER_PATH_WIN" | autodetect_compiler_escape_sexp)
-            autodetect_compiler_COMPILER_WINDOWS_UNIQ_PATH_QUOTED=$(printf "%s" "$autodetect_compiler_COMPILER_WINDOWS_UNIQ_PATH" | autodetect_compiler_escape_sexp)
+            autodetect_compiler_COMPILER_PATH_WIN_QUOTED=$(printf "%s" "$autodetect_compiler_COMPILER_PATH_WIN32" | autodetect_compiler_escape_sexp)
+            autodetect_compiler_COMPILER_WINDOWS_UNIQ_PATH_QUOTED=$(printf "%s" "$autodetect_compiler_COMPILER_WIN32_UNIQ_PATH" | autodetect_compiler_escape_sexp)
             printf "%s\n" "  (\"PATH\" \"$autodetect_compiler_COMPILER_PATH_WIN_QUOTED\")"
             printf "%s\n" "  (\"PATH_COMPILER\" \"$autodetect_compiler_COMPILER_WINDOWS_UNIQ_PATH_QUOTED\")"
         elif [ "$autodetect_compiler_OUTPUTMODE" = LAUNCHER ]; then
             autodetect_compiler_COMPILER_ESCAPED_UNIX_UNIQ_PATH=$(printf "%s\n" "$autodetect_compiler_COMPILER_UNIX_UNIQ_PATH" | autodetect_compiler_escape_envarg)
-            printf "%s\n" "  PATH='$autodetect_compiler_COMPILER_ESCAPED_UNIX_UNIQ_PATH':\"\$PATH\" \\"
+            if is_unixy_windows_build_machine; then
+                # Cygwin/MSYS2 use colon separator
+                printf "%s\n" "  PATH='$autodetect_compiler_COMPILER_ESCAPED_UNIX_UNIQ_PATH':\"\$PATH\" \\"
+            else
+                # BusyBox-w32's sh.exe uses semicolon separator
+                printf "%s\n" "  PATH='$autodetect_compiler_COMPILER_ESCAPED_UNIX_UNIQ_PATH';\"\$PATH\" \\"
+            fi
         fi
     }
     autodetect_compiler_write_output --has-supplied-post-transform

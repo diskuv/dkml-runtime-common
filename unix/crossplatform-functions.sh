@@ -2189,6 +2189,13 @@ autodetect_compiler_write_output() {
             printf "set -euf\n"
             if [ -n "${autodetect_compiler_PATH_PREFIX:-}" ]; then
                 printf "export PATH='%s':\"\$PATH\"\n" "$autodetect_compiler_PATH_PREFIX"
+                if is_unixy_windows_build_machine || [ -z "${COMSPEC:-}" ]; then
+                    # Unix or Cygwin/MSYS2. All use colon separator
+                    printf "export PATH='%s:'\"\$PATH\"\n" "$autodetect_compiler_PATH_PREFIX"
+                else
+                    # Non-Cygwin/MSYS2 Windows. BusyBox-w32's sh.exe uses semicolon separator
+                    printf "export PATH='%s;'\"\$PATH\"\n" "$autodetect_compiler_PATH_PREFIX"
+                fi
             fi
             printf "%s\n" "exec $DKMLSYS_ENV \\"
 
@@ -3161,10 +3168,10 @@ autodetect_compiler_vsdev() {
             autodetect_compiler_COMPILER_ESCAPED_UNIX_UNIQ_PATH=$(printf "%s\n" "$autodetect_compiler_COMPILER_UNIX_UNIQ_PATH" | autodetect_compiler_escape_envarg)
             if is_unixy_windows_build_machine; then
                 # Cygwin/MSYS2 use colon separator
-                printf "%s\n" "  PATH='$autodetect_compiler_COMPILER_ESCAPED_UNIX_UNIQ_PATH':\"\$PATH\" \\"
+                printf "%s\n" "  PATH='$autodetect_compiler_COMPILER_ESCAPED_UNIX_UNIQ_PATH:'\"\$PATH\" \\"
             else
                 # BusyBox-w32's sh.exe uses semicolon separator
-                printf "%s\n" "  PATH='$autodetect_compiler_COMPILER_ESCAPED_UNIX_UNIQ_PATH';\"\$PATH\" \\"
+                printf "%s\n" "  PATH='$autodetect_compiler_COMPILER_ESCAPED_UNIX_UNIQ_PATH;'\"\$PATH\" \\"
             fi
         fi
     }

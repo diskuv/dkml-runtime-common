@@ -3013,31 +3013,19 @@ autodetect_compiler_vsdev() {
     # SEVENTH, set autodetect_compiler_COMPILER_UNIQ_PATH so that it is only the _unique_ entries
     # (the set {autodetect_compiler_COMPILER_UNIQ_PATH} - {DKML_SYSTEM_PATH_WIN32}) are used. But maintain the order
     # that Microsoft places each path entry.
+    #   Split each semicolon-separated PATH into one entry per line.
     printf "%s" "$autodetect_compiler_COMPILER_PATH_WIN32" | hermetic_util awk 'BEGIN{RS=";"} {print}' > "$autodetect_compiler_TEMPDIR"/vcvars_entries_win32.txt
-    hermetic_util sort -u "$autodetect_compiler_TEMPDIR"/vcvars_entries_win32.txt > "$autodetect_compiler_TEMPDIR"/vcvars_entries_win32.sortuniq.txt
-    printf "%s" "$DKML_SYSTEM_PATH_WIN32" | hermetic_util awk 'BEGIN{RS=";"} {print}' | hermetic_util sort -u > "$autodetect_compiler_TEMPDIR"/path.sortuniq.txt
-    #   Unfortunately uutils' comm has bug https://github.com/uutils/coreutils/issues/12253
-    #   where it incorrectly complains the files are not sorted. Mitigate that
-    #   with: 2> /dev/null || true
-    autodetect_compiler_vsdev_comm_with_mitigation() {
-        hermetic_util comm "$@" 2> /dev/null || true
-    }
-    autodetect_compiler_vsdev_comm_with_mitigation \
-        -23 \
-        "$autodetect_compiler_TEMPDIR"/vcvars_entries_win32.sortuniq.txt \
-        "$autodetect_compiler_TEMPDIR"/path.sortuniq.txt \
-        > "$autodetect_compiler_TEMPDIR"/vcvars_uniq.txt
-    autodetect_compiler_COMPILER_WIN32_UNIQ_PATH=
-    while IFS='' read -r autodetect_compiler_line; do
-        # if and only if the $autodetect_compiler_line matches one of the lines in vcvars_uniq.txt
-        if ! printf "%s\n" "$autodetect_compiler_line" | autodetect_compiler_vsdev_comm_with_mitigation -12 - "$autodetect_compiler_TEMPDIR"/vcvars_uniq.txt | hermetic_util awk 'NF>0{exit 1}'; then
-            if [ -z "$autodetect_compiler_COMPILER_WIN32_UNIQ_PATH" ]; then
-                autodetect_compiler_COMPILER_WIN32_UNIQ_PATH="$autodetect_compiler_line"
-            else
-                autodetect_compiler_COMPILER_WIN32_UNIQ_PATH="$autodetect_compiler_COMPILER_WIN32_UNIQ_PATH;$autodetect_compiler_line"
-            fi
-        fi
-    done < "$autodetect_compiler_TEMPDIR"/vcvars_entries_win32.txt
+    printf "%s" "$DKML_SYSTEM_PATH_WIN32" | hermetic_util awk 'BEGIN{RS=";"} {print}' > "$autodetect_compiler_TEMPDIR"/path_entries_win32.txt
+    #   Emit the vcvars entries that are not present in DKML_SYSTEM_PATH_WIN32, preserving the
+    #   order that Microsoft placed them.
+    autodetect_compiler_COMPILER_WIN32_UNIQ_PATH=$(hermetic_util awk '
+        NR==FNR { exclude[$0]=1; next }
+        !($0 in exclude) {
+            if (autodetect_compiler_out == "") { autodetect_compiler_out=$0 }
+            else { autodetect_compiler_out=autodetect_compiler_out ";" $0 }
+        }
+        END { printf "%s", autodetect_compiler_out }
+    ' "$autodetect_compiler_TEMPDIR"/path_entries_win32.txt "$autodetect_compiler_TEMPDIR"/vcvars_entries_win32.txt)
     #   Replace backslashes with forward slashes (nit: the path separator is still Windows though)
     autodetect_compiler_COMPILER_UNIX_UNIQ_PATH=${autodetect_compiler_COMPILER_WIN32_UNIQ_PATH//\\//}
 

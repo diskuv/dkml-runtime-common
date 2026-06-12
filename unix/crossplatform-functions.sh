@@ -1866,6 +1866,17 @@ autodetect_compiler() {
             autodetect_compiler_OUTPUTFILE="$PWD/$autodetect_compiler_OUTPUTFILE" ;;
     esac
 
+    # Path seperator
+    if [ -x /usr/bin/cygpath ]; then
+        # Cygwin or MSYS2
+        autodetect_compiler_PATHSEP=':'
+    elif [ -n "${COMSPEC:-}" ]; then
+        # Windows without Cygwin or MSYS2. Ex. BusyBox-w32
+        autodetect_compiler_PATHSEP=';'
+    else
+        # Unix
+        autodetect_compiler_PATHSEP=':'
+    fi
 
     # Validate compile spec
     autodetect_compiler_SPECBITS=""
@@ -2188,14 +2199,7 @@ autodetect_compiler_write_output() {
             printf "%s\n" "#!$DKML_POSIX_SHELL"
             printf "set -euf\n"
             if [ -n "${autodetect_compiler_PATH_PREFIX:-}" ]; then
-                printf "export PATH='%s':\"\$PATH\"\n" "$autodetect_compiler_PATH_PREFIX"
-                if is_unixy_windows_build_machine || [ -z "${COMSPEC:-}" ]; then
-                    # Unix or Cygwin/MSYS2. All use colon separator
-                    printf "export PATH='%s:'\"\$PATH\"\n" "$autodetect_compiler_PATH_PREFIX"
-                else
-                    # Non-Cygwin/MSYS2 Windows. BusyBox-w32's sh.exe uses semicolon separator
-                    printf "export PATH='%s;'\"\$PATH\"\n" "$autodetect_compiler_PATH_PREFIX"
-                fi
+                printf "export PATH='%s%s'\"\$PATH\"\n" "$autodetect_compiler_PATH_PREFIX" "${autodetect_compiler_PATHSEP}"
             fi
             printf "%s\n" "exec $DKMLSYS_ENV \\"
 
@@ -2590,7 +2594,7 @@ autodetect_compiler_cmake() {
             case "$autodetect_compiler_add_parent_to_msvs_path_VAL" in
                 /*) # absolute Unix path
                     autodetect_compiler_add_parent_to_msvs_path_VAL=$(hermetic_util dirname "$autodetect_compiler_add_parent_to_msvs_path_VAL")
-                    autodetect_compiler_MSVS_PATH="$autodetect_compiler_add_parent_to_msvs_path_VAL${autodetect_compiler_MSVS_PATH:+:$autodetect_compiler_MSVS_PATH}"
+                    autodetect_compiler_MSVS_PATH="$autodetect_compiler_add_parent_to_msvs_path_VAL${autodetect_compiler_MSVS_PATH:+${autodetect_compiler_PATHSEP}$autodetect_compiler_MSVS_PATH}"
             esac
         fi
     }
@@ -3166,13 +3170,7 @@ autodetect_compiler_vsdev() {
             printf "%s\n" "  (\"PATH_COMPILER\" \"$autodetect_compiler_COMPILER_WINDOWS_UNIQ_PATH_QUOTED\")"
         elif [ "$autodetect_compiler_OUTPUTMODE" = LAUNCHER ]; then
             autodetect_compiler_COMPILER_ESCAPED_UNIX_UNIQ_PATH=$(printf "%s\n" "$autodetect_compiler_COMPILER_UNIX_UNIQ_PATH" | autodetect_compiler_escape_envarg)
-            if is_unixy_windows_build_machine; then
-                # Cygwin/MSYS2 use colon separator
-                printf "%s\n" "  PATH='$autodetect_compiler_COMPILER_ESCAPED_UNIX_UNIQ_PATH:'\"\$PATH\" \\"
-            else
-                # BusyBox-w32's sh.exe uses semicolon separator
-                printf "%s\n" "  PATH='$autodetect_compiler_COMPILER_ESCAPED_UNIX_UNIQ_PATH;'\"\$PATH\" \\"
-            fi
+            printf "%s\n" "  PATH='$autodetect_compiler_COMPILER_ESCAPED_UNIX_UNIQ_PATH${autodetect_compiler_PATHSEP}'\"\$PATH\" \\"
         fi
     }
     autodetect_compiler_write_output --has-supplied-post-transform

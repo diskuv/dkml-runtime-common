@@ -438,39 +438,49 @@ __autodetect_system_path_push_git() {
     fi
 }
 __autodetect_system_path_push_usr_bin() {
-    __autodetect_system_path_push_usr_bin_PATH=
-
+    # System paths based on the machine
     if is_cygwin_build_machine; then
-        __autodetect_system_path_push_usr_bin_PATH=/usr/bin:/bin
+        __autodetect_system_path_push_usr_bin_PATH_UNIX=/usr/bin:/bin
+        __autodetect_system_path_push_usr_bin_PATH_WIN32="/usr/bin;/bin"
     elif is_msys2_msys_build_machine; then
         # /bin is a mount (essentially a symlink) to /usr/bin on MSYS2
-        __autodetect_system_path_push_usr_bin_PATH=/usr/bin
+        __autodetect_system_path_push_usr_bin_PATH_UNIX=/usr/bin
+        __autodetect_system_path_push_usr_bin_PATH_WIN32="/usr/bin"
     elif [ -n "${COMSPEC:-}" ]; then
         # Windows but not MSYS2 or Cygwin. Ex. BusyBox-w32
         # No /usr/bin or /bin available.
-        true
+        __autodetect_system_path_push_usr_bin_PATH_UNIX=
+        __autodetect_system_path_push_usr_bin_PATH_WIN32=
     else
         # Unix
-        __autodetect_system_path_push_usr_bin_PATH=/usr/bin:/bin
+        __autodetect_system_path_push_usr_bin_PATH_UNIX=/usr/bin:/bin
+        __autodetect_system_path_push_usr_bin_PATH_WIN32="/usr/bin;/bin"
+    fi
+    __autodetect_system_path_push_usr_bin_PATH=$__autodetect_system_path_push_usr_bin_PATH_UNIX
+
+    # Append DK_UNIX_ESSENTIALS
+    if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -d "$DK_UNIX_ESSENTIALS/bin" ]; then
+        __autodetect_system_path_push_usr_bin_PATH="$__autodetect_system_path_push_usr_bin_PATH:$DK_UNIX_ESSENTIALS/bin"
+        __autodetect_system_path_push_usr_bin_PATH_UNIX="$__autodetect_system_path_push_usr_bin_PATH_UNIX:$DK_UNIX_ESSENTIALS/bin"
+        __autodetect_system_path_push_usr_bin_PATH_WIN32="$__autodetect_system_path_push_usr_bin_PATH_WIN32;$DK_UNIX_ESSENTIALS\\bin"
     fi
 
-    # Add to DKML_SYSTEM_PATH_UNIX/_WIN32 and deprecated DKML_SYSTEM_PATH
+    # Append existing DKML_SYSTEM_PATH_{UNIX,WIN32} and deprecated DKML_SYSTEM_PATH
     if [ -n "${DKML_SYSTEM_PATH_UNIX:-}" ]; then
-        if [ -n "$__autodetect_system_path_push_usr_bin_PATH" ]; then
-            DKML_SYSTEM_PATH="$__autodetect_system_path_push_usr_bin_PATH:$DKML_SYSTEM_PATH"
-            DKML_SYSTEM_PATH_UNIX="$__autodetect_system_path_push_usr_bin_PATH:$DKML_SYSTEM_PATH_UNIX"
-            DKML_SYSTEM_PATH_WIN32="$__autodetect_system_path_push_usr_bin_PATH;$DKML_SYSTEM_PATH_WIN32"
-        fi
+        __autodetect_system_path_push_usr_bin_PATH="$__autodetect_system_path_push_usr_bin_PATH:$DKML_SYSTEM_PATH"
+        __autodetect_system_path_push_usr_bin_PATH_UNIX="$__autodetect_system_path_push_usr_bin_PATH_UNIX:$DKML_SYSTEM_PATH_UNIX"
+        __autodetect_system_path_push_usr_bin_PATH_WIN32="$__autodetect_system_path_push_usr_bin_PATH_WIN32;$DKML_SYSTEM_PATH_WIN32"
+    fi
+
+    # Set DKML_SYSTEM_PATH*
+    if [ -n "$__autodetect_system_path_push_usr_bin_PATH" ]; then
+        DKML_SYSTEM_PATH="$__autodetect_system_path_push_usr_bin_PATH"
+        DKML_SYSTEM_PATH_UNIX="$__autodetect_system_path_push_usr_bin_PATH_UNIX"
+        DKML_SYSTEM_PATH_WIN32="$__autodetect_system_path_push_usr_bin_PATH_WIN32"
     else
-        if [ -n "$__autodetect_system_path_push_usr_bin_PATH" ]; then
-            DKML_SYSTEM_PATH="$__autodetect_system_path_push_usr_bin_PATH"
-            DKML_SYSTEM_PATH_UNIX="$__autodetect_system_path_push_usr_bin_PATH"
-            DKML_SYSTEM_PATH_WIN32="$__autodetect_system_path_push_usr_bin_PATH"
-        else
-            DKML_SYSTEM_PATH=
-            DKML_SYSTEM_PATH_UNIX=
-            DKML_SYSTEM_PATH_WIN32=
-        fi
+        DKML_SYSTEM_PATH=
+        DKML_SYSTEM_PATH_UNIX=
+        DKML_SYSTEM_PATH_WIN32=
     fi
 }
 
@@ -2111,7 +2121,9 @@ compiler_clear_environment() {
 # * autodetect_compiler_MSVS_NAME
 # * autodetect_compiler_MSVS_INC. Separated by semicolons. No trailing semicolon.
 # * autodetect_compiler_MSVS_LIB. Separated by semicolons. No trailing semicolon.
-# * autodetect_compiler_MSVS_PATH. Unix PATH format with no trailing colon.
+# * autodetect_compiler_MSVS_PATH. Unix PATH format with no trailing colon, except
+#      on Windows without Cygwin/MSYS2 (ex.  BusyBox-w32's sh.exe) it will be
+#      Windows PATH format
 #
 # Generally the variables conform to the description in
 # https://www.gnu.org/software/make/manual/html_node/Implicit-Variables.html.
@@ -2398,7 +2410,10 @@ output_make ()
             # MSVS_NAME
             printf "MSVS_NAME='%s'\n" "$autodetect_compiler_MSVS_NAME"
 
-            # MSVS_PATH which must be in Unix PATH format with a trailing colon
+            # MSVS_PATH which must be in Unix PATH format with a trailing colon,
+            # or Windows PATH format with a trailing colon on Windows without
+            # Cygwin/MSYS2 (ex. BusyBox-w32's sh.exe). The trailing colon must
+            # be present as it is part of the msvs-tools implicit specification.
             printf "MSVS_PATH='%s:'\n" "$autodetect_compiler_MSVS_PATH"
 
             # MSVS_INC which must have a trailing semicolon

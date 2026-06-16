@@ -3001,6 +3001,18 @@ autodetect_compiler_vsdev() {
     autodetect_compiler_COMPILER_PATH_UNIX=$(hermetic_util cat "$autodetect_compiler_TEMPDIR"/unixpath.txt)
     autodetect_compiler_COMPILER_PATH_WIN32=$(hermetic_util cat "$autodetect_compiler_TEMPDIR"/winpath.txt)
 
+    # Prepend DK_UNIX_ESSENTIALS/bin to the compiler PATH.
+    if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -d "$DK_UNIX_ESSENTIALS/bin" ]; then
+        autodetect_compiler_COMPILER_PATH_WIN32="$DK_UNIX_ESSENTIALS\\bin;$autodetect_compiler_COMPILER_PATH_WIN32"
+        if [ -x /usr/bin/cygpath ]; then
+            # Cygwin: unixpath.txt is colon-separated Unix paths.
+            autodetect_compiler_COMPILER_PATH_UNIX="$(/usr/bin/cygpath -au "$DK_UNIX_ESSENTIALS/bin"):$autodetect_compiler_COMPILER_PATH_UNIX"
+        else
+            # BusyBox-w32: unixpath.txt is the semicolon-separated Windows path.
+            autodetect_compiler_COMPILER_PATH_UNIX="$DK_UNIX_ESSENTIALS\\bin;$autodetect_compiler_COMPILER_PATH_UNIX"
+        fi
+    fi
+
     # VERIFY: make sure VsDevCmd.bat gave us the correct target assembler (which have unique names per target architecture)
     # shellcheck disable=SC2016
     autodetect_compiler_TGTARCH=$(hermetic_util awk '

@@ -113,7 +113,8 @@ is_cygwin_build_machine() {
 # - curl.
 # - wget.
 hermetic_util() {
-    case "$1" in
+    hermetic_util_tool=$1
+    case "$hermetic_util_tool" in
         basename|cat|comm|cp|cut|date|dirname|env|install|mktemp|mv|paste|pwd|rm|sort|stat|touch|tr|uname|wc)
             if [ -n "${DK_UNIX_COREUTILS:-}" ]; then
                 "$DK_UNIX_COREUTILS" "$@"
@@ -124,25 +125,25 @@ hermetic_util() {
         cmp)
             if [ -n "${DK_UNIX_DIFFUTILS:-}" ]; then
                 "$DK_UNIX_DIFFUTILS" "$@"
-            elif [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "$DK_UNIX_ESSENTIALS/bin/$1.exe" ]; then
+            elif [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "$DK_UNIX_ESSENTIALS/bin/$hermetic_util_tool.exe" ]; then
                 # BusyBox-w32 requires `-x FILE.exe`. The `-x FILE` test will fail.
                 shift
-                "$DK_UNIX_ESSENTIALS/bin/$1.exe" "$@"
-            elif [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "$DK_UNIX_ESSENTIALS/bin/$1" ]; then
+                "$DK_UNIX_ESSENTIALS/bin/$hermetic_util_tool.exe" "$@"
+            elif [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "$DK_UNIX_ESSENTIALS/bin/$hermetic_util_tool" ]; then
                 shift
-                "$DK_UNIX_ESSENTIALS/bin/$1" "$@"
+                "$DK_UNIX_ESSENTIALS/bin/$hermetic_util_tool" "$@"
             else
                 PATH=/usr/bin:/bin "$@"
             fi
             ;;
         awk|find|grep|sed)
-            if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "$DK_UNIX_ESSENTIALS/bin/$1.exe" ]; then
+            if [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "$DK_UNIX_ESSENTIALS/bin/$hermetic_util_tool.exe" ]; then
                 # BusyBox-w32 requires `-x FILE.exe`. The `-x FILE` test will fail.
                 shift
-                "$DK_UNIX_ESSENTIALS/bin/$1.exe" "$@"
-            elif [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "$DK_UNIX_ESSENTIALS/bin/$1" ]; then
+                "$DK_UNIX_ESSENTIALS/bin/$hermetic_util_tool.exe" "$@"
+            elif [ -n "${DK_UNIX_ESSENTIALS:-}" ] && [ -x "$DK_UNIX_ESSENTIALS/bin/$hermetic_util_tool" ]; then
                 shift
-                "$DK_UNIX_ESSENTIALS/bin/$1" "$@"
+                "$DK_UNIX_ESSENTIALS/bin/$hermetic_util_tool" "$@"
             else
                 PATH=/usr/bin:/bin "$@"
             fi ;;

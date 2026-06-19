@@ -947,7 +947,7 @@ install_reproducible_file() {
     if [ /dev/null -ef /dev/null ] 2>/dev/null; then
         # This script accepts the -ef operator
         if [ ! "$DKMLDIR"/"$_install_reproducible_file_RELFILE" -ef "$_install_reproducible_file_BOOTSTRAPDIR"/"$_install_reproducible_file_RELFILE" ]; then
-            hermetic_util cp -p -t "$_install_reproducible_file_BOOTSTRAPDIR"/"$_install_reproducible_file_RELDIR"/ "$DKMLDIR"/"$_install_reproducible_file_RELFILE"
+            hermetic_util cp -p "$DKMLDIR"/"$_install_reproducible_file_RELFILE" "$_install_reproducible_file_BOOTSTRAPDIR"/"$_install_reproducible_file_RELDIR"/
         fi
     else
         # Sigh; portable scripts are not required to have a [ f1 -ef f2 ] operator. So we compare inodes (assuming `stat` supports `-c`)
@@ -958,7 +958,7 @@ install_reproducible_file() {
             install_reproducible_file_STAT2=
         fi
         if [ ! "$install_reproducible_file_STAT1" = "$install_reproducible_file_STAT2" ]; then
-            hermetic_util cp -p -t "$_install_reproducible_file_BOOTSTRAPDIR"/"$_install_reproducible_file_RELDIR"/ "$DKMLDIR"/"$_install_reproducible_file_RELFILE"
+            hermetic_util cp -p "$DKMLDIR"/"$_install_reproducible_file_RELFILE" "$_install_reproducible_file_BOOTSTRAPDIR"/"$_install_reproducible_file_RELDIR"/
         fi
     fi
 }
@@ -982,7 +982,7 @@ install_reproducible_generated_file() {
     install_reproducible_generated_file_BOOTSTRAPDIR=$DEPLOYDIR_UNIX/$SHARE_REPRODUCIBLE_BUILD_RELPATH/$BOOTSTRAPNAME
     hermetic_util mkdir -p "$install_reproducible_generated_file_BOOTSTRAPDIR"/"$install_reproducible_generated_file_RELDIR"/
     hermetic_util rm -f "$install_reproducible_generated_file_BOOTSTRAPDIR"/"$install_reproducible_generated_file_RELFILE" # ensure if exists it is a regular file or link but not a directory
-    hermetic_util cp -p -T "$install_reproducible_generated_file_SRCFILE" "$install_reproducible_generated_file_BOOTSTRAPDIR"/"$install_reproducible_generated_file_RELFILE"
+    hermetic_util cp -p "$install_reproducible_generated_file_SRCFILE" "$install_reproducible_generated_file_BOOTSTRAPDIR"/"$install_reproducible_generated_file_RELFILE"
 }
 
 # Install a README.md file that go into your reproducible build.
@@ -1120,9 +1120,7 @@ install_reproducible_system_packages() {
         if command -v brew >/dev/null; then
             # Brew exists and its installed packages can be used in the rest of the reproducible scripts.
             if [ -n "${DKML_REPRODUCIBLE_SYSTEM_BREWFILE:-}" ] && [ -e "${DKML_REPRODUCIBLE_SYSTEM_BREWFILE}" ]; then
-                hermetic_util cp -p -T \
-                    "$DKML_REPRODUCIBLE_SYSTEM_BREWFILE" \
-                    "$install_reproducible_system_packages_BOOTSTRAPDIR/$install_reproducible_system_packages_PACKAGEFILE"
+                hermetic_util cp -p "$DKML_REPRODUCIBLE_SYSTEM_BREWFILE" "$install_reproducible_system_packages_BOOTSTRAPDIR/$install_reproducible_system_packages_PACKAGEFILE"
                 # For troubleshooting and a bit of security, place a comment saying the Brewfile was provided not queried
                 printf "\n# This Brewfile was provided to install_reproducible_system_packages() rather than queried.\n# It is possible that this Brewfile was out of date with the system Brew bottles and taps.\n" >> "$install_reproducible_system_packages_BOOTSTRAPDIR/$install_reproducible_system_packages_PACKAGEFILE"
             else

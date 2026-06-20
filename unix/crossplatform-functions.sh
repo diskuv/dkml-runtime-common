@@ -3017,6 +3017,13 @@ autodetect_compiler_vsdev() {
         fi
     fi
 
+    # Similarly, append /usr/bin:/bin so the host `sh ./configure` finds the
+    # MSYS2/Cygwin tools like `sed` and `expr`. We append because MSYS2/Cygwin link.exe
+    # conflicts with MSVC link.exe.
+    if [ -x /usr/bin/cygpath ]; then
+        autodetect_compiler_COMPILER_PATH_UNIX="$autodetect_compiler_COMPILER_PATH_UNIX:/usr/bin:/bin"
+    fi
+
     # VERIFY: make sure VsDevCmd.bat gave us the correct target assembler (which have unique names per target architecture)
     # shellcheck disable=SC2016
     autodetect_compiler_TGTARCH=$(hermetic_util awk '

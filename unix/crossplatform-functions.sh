@@ -2874,13 +2874,24 @@ autodetect_compiler_vsdev() {
     else
         autodetect_compiler_VSCMD_DEBUG=
     fi
-    #   We will use DKML_SYSTEM_PATH_WIN32 for reproducibility.
+    #   We will use DKML_SYSTEM_PATH_WIN32 for reproducibility. This bat is run by
+    #   cmd.exe, so PATH must be all Windows-format: VsDevCmd's winsdk.bat needs
+    #   reg.exe (in System32) to run, and the MSYS2 tools (sed, expr) must stay
+    #   reachable so the later POSIX re-conversion of this PATH gives the
+    #   `sh ./configure` step its /usr/bin. DKML_SYSTEM_PATH_WIN32 mixes Windows
+    #   dirs (C:\...) with the POSIX /usr/bin, which `cygpath -w` cannot convert in
+    #   one pass (it mis-splits the C:\... entries), so normalize via POSIX first.
+    if [ -x /usr/bin/cygpath ]; then
+        autodetect_compiler_vsdev_SYSTEMPATH_WIN32=$(/usr/bin/cygpath -w --path "$(/usr/bin/cygpath --path "$DKML_SYSTEM_PATH_WIN32")")
+    else
+        autodetect_compiler_vsdev_SYSTEMPATH_WIN32="$DKML_SYSTEM_PATH_WIN32"
+    fi
     {
         printf "@SET TEMP=%s\n" "$autodetect_compiler_TEMPDIR_DOS"
         printf "@SET __VSCMD_ARG_NO_LOGO=1\n"
         printf "@SET VSCMD_SKIP_SENDTELEMETRY=1\n"
         printf "@SET VSCMD_DEBUG=%s\n" "$autodetect_compiler_VSCMD_DEBUG"
-        printf "@SET PATH=%s\n" "$DKML_SYSTEM_PATH_WIN32"
+        printf "@SET PATH=%s\n" "$autodetect_compiler_vsdev_SYSTEMPATH_WIN32"
         printf "@CALL %s%s%s %s\n" '"' "$autodetect_compiler_VSDEVCMDFILE_WIN" '"' "$autodetect_compiler_VSDEVCMD_OPTIONS"
         printf "%s\n" '@SET _VSERR=%ERRORLEVEL%'
         printf "%s\n" 'if %_VSERR% neq 0 ('

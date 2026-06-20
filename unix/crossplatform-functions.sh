@@ -3017,13 +3017,6 @@ autodetect_compiler_vsdev() {
         fi
     fi
 
-    # Similarly, append /usr/bin:/bin so the host `sh ./configure` finds the
-    # MSYS2/Cygwin tools like `sed` and `expr`. We append because MSYS2/Cygwin link.exe
-    # conflicts with MSVC link.exe.
-    if [ -x /usr/bin/cygpath ]; then
-        autodetect_compiler_COMPILER_PATH_UNIX="$autodetect_compiler_COMPILER_PATH_UNIX:/usr/bin:/bin"
-    fi
-
     # VERIFY: make sure VsDevCmd.bat gave us the correct target assembler (which have unique names per target architecture)
     # shellcheck disable=SC2016
     autodetect_compiler_TGTARCH=$(hermetic_util awk '
@@ -3057,6 +3050,7 @@ autodetect_compiler_vsdev() {
     printf "%s" "$DKML_SYSTEM_PATH_WIN32" | hermetic_util awk 'BEGIN{RS=";"} {print}' > "$autodetect_compiler_TEMPDIR"/path_entries_win32.txt
     #   Emit the vcvars entries that are not present in DKML_SYSTEM_PATH_WIN32, preserving the
     #   order that Microsoft placed them.
+    #   shellcheck disable=SC2016
     autodetect_compiler_COMPILER_WIN32_UNIQ_PATH=$(hermetic_util awk '
         NR==FNR { exclude[$0]=1; next }
         !($0 in exclude) {
@@ -3067,6 +3061,12 @@ autodetect_compiler_vsdev() {
     ' "$autodetect_compiler_TEMPDIR"/path_entries_win32.txt "$autodetect_compiler_TEMPDIR"/vcvars_entries_win32.txt)
     #   Replace backslashes with forward slashes (nit: the path separator is still Windows though)
     autodetect_compiler_COMPILER_UNIX_UNIQ_PATH=${autodetect_compiler_COMPILER_WIN32_UNIQ_PATH//\\//}
+    #   Append /usr/bin:/bin so the host `sh ./configure` (whose PATH is generated
+    #   from this unique compiler PATH) can find the MSYS2/Cygwin POSIX tools like
+    #   `sed` and `expr`.
+    if [ -x /usr/bin/cygpath ]; then
+        autodetect_compiler_COMPILER_UNIX_UNIQ_PATH="$autodetect_compiler_COMPILER_UNIX_UNIQ_PATH:/usr/bin:/bin"
+    fi
 
     # EIGHTH, Standardized compiler environment variables
     #   When compiling opam, the opam ./configure cannot handle spaces. Probably

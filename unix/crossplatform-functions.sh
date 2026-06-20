@@ -3059,13 +3059,16 @@ autodetect_compiler_vsdev() {
         }
         END { printf "%s", autodetect_compiler_out }
     ' "$autodetect_compiler_TEMPDIR"/path_entries_win32.txt "$autodetect_compiler_TEMPDIR"/vcvars_entries_win32.txt)
-    #   Replace backslashes with forward slashes (nit: the path separator is still Windows though)
-    autodetect_compiler_COMPILER_UNIX_UNIQ_PATH=${autodetect_compiler_COMPILER_WIN32_UNIQ_PATH//\\//}
-    #   Append /usr/bin:/bin so the host `sh ./configure` (whose PATH is generated
-    #   from this unique compiler PATH) can find the MSYS2/Cygwin POSIX tools like
-    #   `sed` and `expr`.
     if [ -x /usr/bin/cygpath ]; then
+        #   Cygwin/MSYS2: Convert it to ':'-separated POSIX paths with cygpath.
+        autodetect_compiler_COMPILER_UNIX_UNIQ_PATH=$(printf "%s" "$autodetect_compiler_COMPILER_WIN32_UNIQ_PATH" | /usr/bin/cygpath --path -f -)
+        #   Append /usr/bin:/bin so the same `./configure` finds sed, expr, etc.
+        #   Append so MSVC link.exe is found before Cygwin/MSYS2 link.exe (etc.).
         autodetect_compiler_COMPILER_UNIX_UNIQ_PATH="$autodetect_compiler_COMPILER_UNIX_UNIQ_PATH:/usr/bin:/bin"
+    else
+        #   Replace backslashes with forward slashes (nit: the path separator is
+        #   still Windows ';' though, which is correct for BusyBox-w32 sh).
+        autodetect_compiler_COMPILER_UNIX_UNIQ_PATH=${autodetect_compiler_COMPILER_WIN32_UNIQ_PATH//\\//}
     fi
 
     # EIGHTH, Standardized compiler environment variables

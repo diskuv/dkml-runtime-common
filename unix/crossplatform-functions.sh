@@ -2460,7 +2460,17 @@ autodetect_compiler_cmake() {
     elif [ -n "${DKML_COMPILE_CM_CMAKE_ASM_NASM_COMPILER:-}" ]; then
         autodetect_compiler_cmake_THE_AS=$DKML_COMPILE_CM_CMAKE_ASM_NASM_COMPILER
     elif [ -n "${DKML_COMPILE_CM_CMAKE_ASM_MASM_COMPILER:-}" ]; then
-        autodetect_compiler_cmake_THE_AS=$DKML_COMPILE_CM_CMAKE_ASM_MASM_COMPILER
+        # Use the basename of the MASM assembler (ml64.exe / ml.exe) rather than
+        # its full path. OCaml's runtime Makefile invokes the assembler through
+        # make's direct CreateProcess (no shell), which mis-parses the spaces in
+        # a Visual Studio path such as
+        # "C:/Program Files/Microsoft Visual Studio/18/Enterprise/.../ml64.exe"
+        # and fails with "The system cannot find the file specified". The MSVC
+        # bin directory is already prepended to the compiler PATH, so the
+        # basename resolves to the same assembler. This matches OCaml's own
+        # default_as="ml64 -nologo -Cp -c -Fo". CMake reports the path with
+        # forward slashes, so stripping up to the last slash yields the basename.
+        autodetect_compiler_cmake_THE_AS=${DKML_COMPILE_CM_CMAKE_ASM_MASM_COMPILER##*/}
     elif [ -n "${DKML_COMPILE_CM_CMAKE_ASM_ATT_COMPILER:-}" ]; then
         autodetect_compiler_cmake_THE_AS=$DKML_COMPILE_CM_CMAKE_ASM_ATT_COMPILER
     fi

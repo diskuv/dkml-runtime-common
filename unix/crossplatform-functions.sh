@@ -1117,7 +1117,11 @@ install_reproducible_system_packages() {
         # Use a Brewfile.lock.json as the package manifest.
         # However, when `brew` is not available (ex. Xcode runs CMake with a PATH that excludes homebrew) it is likely
         # that no brew installed packages are available either.
-        if command -v brew >/dev/null; then
+        # Probe brew the same hermetic way the brew commands below are invoked.
+        # hermetic_util resets PATH to /usr/bin:/bin (when DK_UNIX_COREUTILS is
+        # unset), which excludes the usual Homebrew prefix such as
+        # /opt/homebrew/bin.
+        if hermetic_util env brew --version >/dev/null 2>&1; then
             # Brew exists and its installed packages can be used in the rest of the reproducible scripts.
             if [ -n "${DKML_REPRODUCIBLE_SYSTEM_BREWFILE:-}" ] && [ -e "${DKML_REPRODUCIBLE_SYSTEM_BREWFILE}" ]; then
                 hermetic_util cp -p "$DKML_REPRODUCIBLE_SYSTEM_BREWFILE" "$install_reproducible_system_packages_BOOTSTRAPDIR/$install_reproducible_system_packages_PACKAGEFILE"
